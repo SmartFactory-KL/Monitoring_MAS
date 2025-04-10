@@ -1,0 +1,21 @@
+/** 
+ * 
+ */
+package capacities
+
+import java.util.Map
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+capacity SharedResourceCapacity { 
+	
+	def changeCounter(key : String, increase : boolean)
+	
+	def getCounter() : Map<String, Integer>
+	def getCounter(key : String) : Integer
+	
+	def addKeyCounter(key : String)
+	def addKeyUncertainty(key : String)
+}

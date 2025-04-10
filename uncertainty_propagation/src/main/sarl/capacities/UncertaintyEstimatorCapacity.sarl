@@ -1,0 +1,18 @@
+/** 
+ * 
+ */
+package capacities
+
+import java.util.List
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+capacity UncertaintyEstimatorCapacity {
+	
+	def estimate_action_uncertainty(skillId : String) : double[]
+	def fuse(uncertainties : List<double[]>) : double[]
+	
+//	def calculateUncertainty(step : SubmodelElementCollection) : double[]
+}

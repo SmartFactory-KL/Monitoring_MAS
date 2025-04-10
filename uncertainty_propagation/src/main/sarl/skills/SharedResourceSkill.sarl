@@ -1,0 +1,61 @@
+/** 
+ * 
+ */
+package skills
+
+import capacities.SharedResourceCapacity
+import java.util.Map
+import java.util.HashMap
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import java.util.List
+import java.util.ArrayList
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+skill SharedResourceSkill implements SharedResourceCapacity {
+
+	var counter : Map<String, Integer> = new HashMap<String, Integer>()
+	var uncertainties : Map<String, List<SubmodelElementCollection>> = new HashMap<String, List<SubmodelElementCollection>>()
+ 
+	def synchronized changeCounter(key : String, increase : boolean) {
+		if (increase) {
+			counter.put(key, counter.get(key) + 1)
+		} else {
+			counter.put(key, counter.get(key) - 1)
+		}
+	}
+ 
+	def synchronized changeUncertainty(key : String, content : SubmodelElementCollection) {
+		this.uncertainties.get(key).add(content)
+	}
+
+	def getCounter() : Map<String, Integer> {
+		return counter
+	}
+
+	def getUncertainty() : Map<String, List<SubmodelElementCollection>> {
+		return uncertainties
+	}
+
+	def getCounter(key : String) : Integer {
+		return counter.get(key)
+	}
+
+	def getUncertainty(key : String) : List<SubmodelElementCollection> {
+		return uncertainties.get(key)
+	}
+
+	def addKeyCounter(key : String) {
+		counter.putIfAbsent(key, 0)
+	}
+
+	def addKeyUncertainty(key : String) {
+		uncertainties.putIfAbsent(key, new ArrayList<SubmodelElementCollection>())
+	}
+
+	new() {
+	}
+
+}

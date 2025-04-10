@@ -1,0 +1,428 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.Lifecycle
+import io.sarl.core.DefaultContextInteractions
+import events.RequestProduction
+import events.ExecutionRequest
+import events.ResourceUpdate
+import java.util.Map
+import java.time.OffsetDateTime;
+import java.util.HashMap
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import skills.UncertaintyEstimatorSkill
+import skills.SharedResourceSkill
+import capacities.UncertaintyEstimatorCapacity
+import capacities.SharedResourceCapacity
+import org.eclipse.digitaltwin.aas4j.v3.model.Entity
+import org.eclipse.digitaltwin.aas4j.v3.model.EntityType
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import events.ExecutionUpdate
+import io.sarl.core.ExternalContextAccess
+import i40_messages.I40_MessageTypes
+import i40_messages.I40_Message
+import java.util.UUID
+import java.util.List
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import java.util.ArrayList
+import helper.AasGenerator
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import org.eclipse.digitaltwin.aas4j.v3.model.DataTypeDefXsd;
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceTypes;
+import org.eclipse.digitaltwin.aas4j.v3.model.KeyTypes
+import main.Agent
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+@SuppressWarnings("discouraged_occurrence_readonly_use")
+agent ResourceAgent extends AbstractAgent {
+	uses Logging, Lifecycle, DefaultContextInteractions, ExternalContextAccess
+
+	var estimateUncertaintySkill : UncertaintyEstimatorSkill
+
+	var bom : Submodel 
+	var skillSM : Submodel
+	var productionPlan : Submodel
+	var productionLog : Submodel
+
+	var aasgen : AasGenerator
+	var skills : Map<String, String>
+	var messageBuffer : Map<String, String[]> = new HashMap<String, String[]>
+
+	var sharedResourceSkill3 : SharedResourceSkill
+
+	var childSteps : Map<String, String> = new HashMap<String, String>
+
+	def spawnSubAgents() {
+		var resource_holon = bom.submodelElements.stream().findFirst().get()
+		if (!(resource_holon instanceof Entity)) {
+			warning("On the top level of the bom of AAS " + aas.idShort +
+				" a single entity of the resource represented by the AAS is expected.")
+			return
+		}
+		var resource_holon_entity = resource_holon as Entity
+		if (resource_holon_entity.statements.size < 1) {
+			info("The topology of the resource AAS " + aas.idShort + " does not contain any agent.")
+		}
+		for (resource : resource_holon_entity.statements) {
+			var resource_Entity = resource as Entity
+			var globalAssetId : String = resource_Entity.globalAssetId
+			if (resource_Entity.entityType != EntityType.SELF_MANAGED_ENTITY) {
+				info("The entity " + resource_Entity.idShort + " in the bom of resource " + resource_holon.idShort +
+					"is co-managed and no AAS is searched.")
+			} else if (globalAssetId === null) {
+				warning("Warning the global asset id of the resource " + resource_Entity.idShort + " is null.")
+			} else {
+				info("Spwan agnet with asset id: " + globalAssetId)
+				spawnInContext(ResourceAgent, defaultContext, globalAssetId, sharedResourceSkill)
+			}
+		}
+	}
+
+	on Initialize {
+		if (this.init(occurrence.parameters, "Resource")) {
+			bom = aasHelper.getSubmodelByIdShort(aas, "BillOfMaterial")
+			skillSM = aasHelper.getSubmodelByIdShort(aas, "Skills")
+			productionPlan = aasHelper.getSubmodelByIdShort(aas, "ProductionPlan")
+			productionLog = aasHelper.getSubmodelByIdShort(aas, "ProductionLog")
+
+			this.resetAAS()
+			this.spawnSubAgents()
+			aasgen = new AasGenerator()
+
+			estimateUncertaintySkill = new UncertaintyEstimatorSkill()
+			setSkill(estimateUncertaintySkill, UncertaintyEstimatorCapacity)
+			sharedResourceSkill3 = new SharedResourceSkill
+			setSkill(sharedResourceSkill3, SharedResourceCapacity)
+
+			if (skillSM != null)
+				loadSkills()
+			info("Initializing CC Agent completed. AAS_id: " + aas_id)
+		}
+	}
+
+	on ExecutionRequest [occurrence.message.frame.receiver == this.aas_id] {
+		info("Start request at " + System.nanoTime())
+		var step = occurrence.message.interactionElements.remove(0) as SubmodelElementCollection
+		// upload step to AAS
+		var stepList = aasHelper.getAASChild(productionPlan, "Steps") as SubmodelElementList;
+		stepList.value.add(step)
+		aasHelper.updateSubmodel(productionPlan) 
+
+		var stepId = aasHelper.getAASChild(step, "StepId") as Property
+		/*sharedResourceSkill.addKeyCounter(stepId.value)
+		sharedResourceSkill.addKeyUncertainty(stepId.value)
+		this.executeHierarchicalProduction(stepId, step)*/
+		/*sharedResourceSkill3.addKeyCounter(stepId.value)
+		sharedResourceSkill3.addKeyUncertainty(stepId.value)
+		var messageMetaData = #[occurrence.message.frame.sender, occurrence.message.frame.conversationID, "P"]
+		messageBuffer.put(stepId.value, messageMetaData)
+		this.executeHierarchicalProduction3(step)*/
+		var steps = new ArrayList<SubmodelElementCollection>
+		for (elem : occurrence.message.interactionElements) {
+			if (elem instanceof SubmodelElementCollection) {
+				var step1 = elem as SubmodelElementCollection
+				steps.add(step1)
+			}
+		}
+		
+		var elements = new ArrayList<SubmodelElement>();
+		elements.add(aasgen.createProperty("ConversationId", DataTypeDefXsd.STRING, occurrence.message.frame.conversationID))
+		elements.add(aasgen.createProperty("Sender", DataTypeDefXsd.STRING, occurrence.message.frame.sender))
+		var productMetaData = aasgen.createSMC("UncertaintyResult", elements) 
+		this.executeHeterarchicalProduction2(null, productMetaData, steps)
+	}
+
+	on ResourceUpdate [occurrence.message.frame.receiver == this.aas_id] {
+		var stepId = occurrence.message.interactionElements.get(1) as Property
+		var logEntry = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+		var dataObjects = aasHelper.getAASChild(logEntry, "DataObjects") as SubmodelElementList
+		if (occurrence.uc == 1) {
+			sharedResourceSkill.changeCounter(stepId.value, false)
+//			info("Counter: " + sharedResourceSkill.getCounter())
+			sharedResourceSkill.changeUncertainty(stepId.value, (dataObjects.value.get(0) as SubmodelElementCollection))
+			if (sharedResourceSkill.getCounter(stepId.value) <= 0) {
+				var result = estimateUncertaintySkill.fuseSMC(sharedResourceSkill.getUncertainty(stepId.value))
+				// create output message based on results
+				info(
+					"Resulting distributed uncertainty 1: [" + result.get(0) + ", " + result.get(1) + ", " +
+						result.get(2) + "]")
+				emitExecutionUpdateMessage(result, 1, occurrence.message.frame.conversationID, occurrence.message.frame.sender)
+			}
+		} else if (occurrence.uc == 3) {
+			var parentStepId = this.childSteps.remove(stepId.value)
+			sharedResourceSkill3.changeCounter(parentStepId, false)
+			sharedResourceSkill3.changeUncertainty(parentStepId,
+				(dataObjects.value.get(0) as SubmodelElementCollection))
+			generateFinalOutput(messageBuffer.get(parentStepId).get(0), messageBuffer.get(parentStepId).get(1),
+				parentStepId)
+		}
+	}
+
+	on RequestProduction [occurrence.message.frame.receiver == this.aas_id] {
+		if (occurrence.uc == 1) {
+			var step = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+			var generalStepId = occurrence.message.interactionElements.get(1) as Property
+			var stepId = aasHelper.getAASChild(step, "StepId") as Property
+			var actions = aasHelper.getAASChild(step, "Actions") as SubmodelElementList
+			if (actions !== null) {
+				var uncertainties = new ArrayList<double[]>
+				sharedResourceSkill.changeCounter(generalStepId.value, true)
+				for (action : actions.value) {
+					var actionSMC = action as SubmodelElementCollection
+					var actionReference = aasHelper.getAASChild(actionSMC, "SkillReference") as ReferenceElement;
+					// TODO add useful skill specific execution
+					uncertainties.add(estimateUncertaintySkill.estimate_action_uncertainty(actionReference.toString))
+				}
+				var result = estimateUncertaintySkill.fuse(uncertainties)
+				emitResourceUpdateMessage(result, 1, generalStepId.value, occurrence.message.frame.sender, occurrence.message.frame.conversationID)
+			}
+		} else if (occurrence.uc == 2) {
+			var uncertainty = occurrence.message.interactionElements.remove(0) as SubmodelElementCollection
+			var productMetaData = occurrence.message.interactionElements.remove(0) as SubmodelElementCollection
+			var steps = new ArrayList<SubmodelElementCollection>
+			for (elem : occurrence.message.interactionElements) {
+				if (elem instanceof SubmodelElementCollection) {
+					var step = elem as SubmodelElementCollection
+					steps.add(step)
+				}
+			}
+			this.executeHeterarchicalProduction2(uncertainty, productMetaData, steps)
+		} else if (occurrence.uc == 3) {
+			var step = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+			var stepId = aasHelper.getAASChild(step, "StepId") as Property
+			sharedResourceSkill3.addKeyCounter(stepId.value)
+			sharedResourceSkill3.addKeyUncertainty(stepId.value)
+			var messageMetaData = #[occurrence.message.frame.sender, occurrence.message.frame.conversationID]
+			messageBuffer.put(stepId.value, messageMetaData)
+			this.executeHierarchicalProduction3(step)
+		} else {
+			error("No connection type defined when requesting a component")
+		}
+	}
+
+	def loadSkills() {
+		skills = new HashMap<String, String>()
+		var skillList : SubmodelElementList = skillSM.submodelElements.stream().filter([ smc |
+			smc.getIdShort().contains("SkillSet")
+		]).findFirst().get() as SubmodelElementList;
+		for (resskill : skillList.value) {
+			var resskillSMC = resskill as SubmodelElementCollection
+			var buffer : String = ""
+			for (skillEntry : resskillSMC.value) {
+				if (skillEntry instanceof Property) {
+					if (skillEntry.idShort.equals("SkillId")) {
+						buffer = skillEntry.value
+					} else if (skillEntry.idShort.equals("SkillName")) {
+						skills.put(buffer, skillEntry.value)
+					}
+				}
+			}
+		}
+	}
+
+	def arrayToSMC(array : double[]) : SubmodelElementCollection {
+		var elements = new ArrayList<SubmodelElement>();
+		elements.add(aasgen.createProperty("Mean", DataTypeDefXsd.DOUBLE, array.get(0).toString))
+		elements.add(aasgen.createProperty("Variance", DataTypeDefXsd.DOUBLE, array.get(1).toString))
+		elements.add(aasgen.createProperty("Weight", DataTypeDefXsd.DOUBLE, array.get(2).toString))
+		return aasgen.createSMC("UncertaintyResult", elements)
+	}
+
+	def generateLogEntry(dateTime : String, logType : String, description : String,
+		dataObjects : List<SubmodelElement>) : SubmodelElementCollection {
+		var logEntryElems = new ArrayList<SubmodelElement>()
+		logEntryElems.add(aasgen.createProperty("LogId", DataTypeDefXsd.STRING, UUID.randomUUID().toString))
+		logEntryElems.add(aasgen.createProperty("DateTime", DataTypeDefXsd.DATE_TIME, dateTime))
+		logEntryElems.add(aasgen.createProperty("LogType", DataTypeDefXsd.STRING, logType))
+		logEntryElems.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING, description))
+		var refKeys : Map<KeyTypes, String> = new HashMap<KeyTypes, String>()
+		refKeys.put(KeyTypes.ASSET_ADMINISTRATION_SHELL, this.aas_id)
+		logEntryElems.add(aasgen.createReferenceElement("RefResourceAAS", ReferenceTypes.MODEL_REFERENCE, refKeys))
+		logEntryElems.add(aasgen.createSML("DataObjects", dataObjects))
+		return aasgen.createSMC("LogEntry", logEntryElems)
+	}
+
+	def resetAAS() {
+		// reset production plan
+		var stepList = aasHelper.getAASChild(productionPlan, "Steps") as SubmodelElementList;
+		stepList.value.clear
+		aasHelper.updateSubmodel(productionPlan)
+		// reset resource logs
+		var resLogs = aasHelper.getAASChild(productionLog, "ResourceLogs") as SubmodelElementCollection;
+		(aasHelper.getAASChild(resLogs, "ResourceLogs") as SubmodelElementList).value.clear
+		aasHelper.updateSubmodel(productionLog)
+	}
+
+	/*** 
+	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value.
+	 */
+	def executeHierarchicalProduction(stepId : Property, step : SubmodelElementCollection) {
+		subStepCallExecution(stepId, step)
+		var actions = aasHelper.getAASChild(step, "Actions") as SubmodelElementList
+		if (actions !== null) {
+			var interactionElements = new ArrayList<Referable>
+			interactionElements.add(step)
+			interactionElements.add(stepId)
+			emitRequestProductionMessage(step, interactionElements, 1)
+		}
+	}
+
+	/*** 
+	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value.
+	 */
+	def executeHeterarchicalProduction2(pastUncertainty : SubmodelElementCollection,
+		productMetaData : SubmodelElementCollection, steps : List<SubmodelElementCollection>) {
+		if (steps.length > 0) {
+			var step = steps.remove(0)
+			var actions = aasHelper.getAASChild(step, "Actions") as SubmodelElementList
+			if (actions !== null) {
+				var uncertainties = new ArrayList<double[]>()
+				for (action : actions.value) {
+					var actionSMC = action as SubmodelElementCollection
+					var actionReference = aasHelper.getAASChild(actionSMC, "SkillReference") as ReferenceElement
+					// TODO add useful skill specific execution
+					var actionUncertainty = estimateUncertaintySkill.
+						estimate_action_uncertainty(actionReference.toString)
+					uncertainties.add(actionUncertainty)
+				}
+				var actionUncertaintyCollection = arrayToSMC(estimateUncertaintySkill.fuse(uncertainties))
+				var allUncertainties = new ArrayList<SubmodelElementCollection>
+				allUncertainties.add(actionUncertaintyCollection)
+				if (pastUncertainty !== null)
+					allUncertainties.add(pastUncertainty)
+				var result = estimateUncertaintySkill.fuseSMC(allUncertainties)
+				var interactionElements : List<Referable> = new ArrayList<Referable>()
+				if (steps.length > 0) {
+					interactionElements.add(arrayToSMC(result))
+					interactionElements.add(productMetaData)
+					interactionElements.addAll(steps)
+					emitRequestProductionMessage(steps.get(0), interactionElements, 2)
+				} else {
+					info("Resulting distributed uncertainty 2: [" + result.get(0) + ", " + result.get(1) + ", " +
+						result.get(2) + "]")
+					var sender = aasHelper.getAASChild(productMetaData, "Sender") as Property
+					var convId = aasHelper.getAASChild(productMetaData, "ConversationId") as Property
+					emitExecutionUpdateMessage(result, 2, sender.value, convId.value)
+				}
+			}
+		}
+	}
+
+	def executeHierarchicalProduction3(step : SubmodelElementCollection) {
+		subStepCallExecution3(step)
+		var stepId = aasHelper.getAASChild(step, "StepId") as Property
+		var actions = aasHelper.getAASChild(step, "Actions") as SubmodelElementList
+		if (actions !== null) {
+			var uncertainties = new ArrayList<double[]>()
+			for (action : actions.value) {
+				var actionSMC = action as SubmodelElementCollection
+				var actionReference = aasHelper.getAASChild(actionSMC, "SkillReference") as ReferenceElement
+				// TODO add useful skill specific execution
+				var result = estimateUncertaintySkill.estimate_action_uncertainty(actionReference.toString)
+				uncertainties.add(result)
+			}
+			sharedResourceSkill3.changeUncertainty(stepId.value,
+				arrayToSMC(estimateUncertaintySkill.fuse(uncertainties)))
+			generateFinalOutput(messageBuffer.get(stepId.value).get(0), messageBuffer.get(stepId.value).get(1),
+				stepId.value)
+		}
+	}
+
+	/** 
+	 * This routine represents the uncertainty of a substep und fetches all uncertainty of itschilds and returns one shared uncerainty to the product holen.
+	 */
+	private def subStepCallExecution(stepId : Property, step : SubmodelElementCollection) {
+		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList
+		if (substeps !== null) {
+			for (substep : substeps.value) {
+				var substepSMC = substep as SubmodelElementCollection
+				this.executeHierarchicalProduction(stepId, substepSMC)
+			}
+		}
+	}
+
+	private def subStepCallExecution3(step : SubmodelElementCollection) {
+		var stepId = aasHelper.getAASChild(step, "StepId") as Property
+		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList
+		if (substeps !== null) {
+			for (substep : substeps.value) {
+				var substepSMC = substep as SubmodelElementCollection
+				var subStepId = (aasHelper.getAASChild(substepSMC, "StepId") as Property).value
+				this.childSteps.put(subStepId, stepId.value)
+				sharedResourceSkill3.changeCounter(stepId.value, true)
+				var interactionElements : List<Referable> = new ArrayList<Referable>()
+				interactionElements.add(substepSMC)
+				emitRequestProductionMessage(substepSMC, interactionElements, 3)
+			}
+		}
+	}
+
+	def generateFinalOutput(sender : String, convId : String, stepId : String) {
+		if (sharedResourceSkill3.getCounter(stepId) <= 0) {
+			var fusedUncertainty = estimateUncertaintySkill.fuseSMC(sharedResourceSkill3.getUncertainty(stepId))
+			info(
+				"Resulting distributed uncertainty 3: [" + fusedUncertainty.get(0) + ", " + fusedUncertainty.get(1) +
+					", " + fusedUncertainty.get(2) + "] of step: " + stepId)
+			if (messageBuffer.get(stepId).length > 2) {
+				emitExecutionUpdateMessage(fusedUncertainty, 3, sender, convId)
+			} else {
+				emitResourceUpdateMessage(fusedUncertainty, 3, stepId, sender, convId)
+			}
+		}
+	}
+
+	def emitRequestProductionMessage(step : SubmodelElementCollection, interactionElements : List<Referable>,
+		usecase : int) {
+		var resource = aasHelper.getAASChild(step, "Resource") as SubmodelElementCollection
+		var resourceRef = aasHelper.getAASChild(resource, "ResourceReference") as ReferenceElement
+		var resourceId = resourceRef.value.keys.get(0).value
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
+			I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
+//		info("Emit Request Production Message with size: " + new_message.size)
+		emit(this.comspace, new RequestProduction => [message = new_message; uc = usecase])
+	}
+
+	def emitResourceUpdateMessage(result : double[], usecase : int, stepId : String, sender : String, convId : String) {
+		var interactionElements : List<Referable> = new ArrayList<Referable>()
+		var dataObjectLogList : List<SubmodelElement> = new ArrayList<SubmodelElement>()
+		dataObjectLogList.add(arrayToSMC(result))
+		var logEntry = generateLogEntry(OffsetDateTime.now().toString, "Info", "UncertaintyCalculated",
+			dataObjectLogList)
+		var resLogs = aasHelper.getAASChild(productionLog, "ResourceLogs") as SubmodelElementCollection;
+		var resLogsList = aasHelper.getAASChild(resLogs, "ResourceLogs") as SubmodelElementList
+		resLogsList.value.add(logEntry)
+		aasHelper.updateSubmodel(productionLog)
+//		info("logEntry size: " + Agent.getObjectSize(logEntry))
+		interactionElements.add(logEntry)
+		interactionElements.add(aasgen.createProperty("StepId", DataTypeDefXsd.STRING, stepId))
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, sender,
+			I40_MessageTypes.INFORMING, convId, interactionElements) 
+//		info("Emit Resource Update Message with size: " + new_message.size)
+		emit(this.comspace, new ResourceUpdate => [message = new_message; uc = usecase])
+	}
+
+	def emitExecutionUpdateMessage(result : double[], usecase : int, sender : String, convId : String) {
+		info("Result ready at " + System.nanoTime())
+		var dataObjectLogList : List<SubmodelElement> = new ArrayList<SubmodelElement>()
+		dataObjectLogList.add(arrayToSMC(result))
+		var outLogEntry = generateLogEntry(OffsetDateTime.now().toString, "Info", "UncertaintyCalculated",
+			dataObjectLogList)
+		var resLogs = aasHelper.getAASChild(productionLog, "ResourceLogs") as SubmodelElementCollection;
+		var resLogsList = aasHelper.getAASChild(resLogs, "ResourceLogs") as SubmodelElementList
+		resLogsList.value.add(outLogEntry)
+		aasHelper.updateSubmodel(productionLog)
+		var interactionElements : List<Referable> = new ArrayList<Referable>()
+		interactionElements.add(outLogEntry)
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, sender,
+			I40_MessageTypes.INFORMING, convId, interactionElements)
+//		info("Emit Execution Update Message with size: " + new_message.size)
+		emit(this.comspace, new ExecutionUpdate => [message = new_message])
+	}
+}

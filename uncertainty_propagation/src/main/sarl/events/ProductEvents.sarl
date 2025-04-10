@@ -1,0 +1,27 @@
+/** 
+ * 
+ */
+package events
+
+import i40_messages.I40_Message
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+event ExecutionRequest {
+	var message : I40_Message
+	new () {}
+}
+
+event ExecutionCompleted {
+	var actionID : String
+	
+	new () {}
+}
+
+event ExecutionUpdate {
+	var message : I40_Message
+	
+	new () {}
+}

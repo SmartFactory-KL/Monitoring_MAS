@@ -1,0 +1,142 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import events.ExecutionUpdate
+import events.ExecutionRequest
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import java.util.List
+import io.sarl.core.ExternalContextAccess
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import i40_messages.I40_MessageTypes
+import i40_messages.I40_Message
+import java.util.UUID
+import java.util.ArrayList
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+
+/** 
+ * @author Alexis Bernhard
+ */
+agent ProductAgent extends AbstractAgent {
+	uses Logging, ExternalContextAccess
+
+	var productionPlan : Submodel
+	var productionLog : Submodel
+
+	def executeSteps(steps : List<SubmodelElement>) {
+		if (steps.size > 0) {
+			var step = steps.get(0) as SubmodelElementCollection
+			var resourceSMC = aasHelper.getAASChild(step, "Resource") as SubmodelElementCollection
+			var resourceReference = aasHelper.getAASChild(resourceSMC, "ResourceReference") as ReferenceElement;
+			var resourceId : String = resourceReference.value.keys.get(0).value.toString()
+			var interactionElements : List<Referable> = new ArrayList<Referable>()
+			interactionElements.addAll(steps)
+			var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
+				I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
+			emit(this.comspace, new ExecutionRequest => [message = new_message])
+		}  
+	}
+
+	on Initialize {
+		if (this.init(occurrence.parameters, "Product")) {
+			productionPlan = aasHelper.getSubmodelByIdShort(aas, "ProductionPlan")
+			productionLog = aasHelper.getSubmodelByIdShort(aas, "ProductionLog")
+			resetAAS();
+			var steps = aasHelper.getAASChild(productionPlan, "Steps") as SubmodelElementList;
+			// executeSteps(steps.value)
+			var heterarchicalSteps = new ArrayList<SubmodelElementCollection>
+			for (step : steps.value) {
+				heterarchicalSteps.addAll(transformHierachicalStep(step as SubmodelElementCollection))
+			}
+			steps.value.addAll(heterarchicalSteps)
+			executeSteps(steps.value)
+			info("Initialization process of product AAS " + aas.idShort + " completed.")
+		}
+	}
+
+	/* TBD -> raus?
+	 * on ExecutionUpdate [occurrence.actionID.toLowerCase.equals(
+	 * (cur_action.getAASElement("ActionTitle") as Property).value.toLowerCase) && occurrence.resourceID ==
+	 * (cur_action.getAASElement("SkillReference") as ReferenceElement).value.keys.get(0).value.toString()] {
+	 * info("Test Action1: " + occurrence.actionID + ", Action2: " +
+	 * (cur_action.getAASElement("ActionTitle") as Property).value)
+	 * var actionState : ActionState = ActionState.valueOf(
+	 * (cur_action.getAASElement("Status") as Property).value.toUpperCase);
+	 * switch (occurrence.actionState) {
+	 * case "STOPPED": actionState = actionState.suspend()
+	 * case "EXECUTE": actionState = actionState.start()
+	 * case "IDLE": actionState = actionState.reset()
+	 * case "HELD": actionState = actionState.suspend()
+	 * case "SUSPENDED": actionState = actionState.suspend()
+	 * case "COMPLETE": actionState = actionState.complete()
+	 * case "ABORTED": actionState = actionState.abort()
+	 * }
+	 * info("Update action " + occurrence.actionID + ", current state: " + occurrence.actionState + ", new state: " +
+	 * actionState)
+	 * (cur_action.getAASElement("Status") as Property).value = actionState.toString.toLowerCase
+	 * aasHelper.updateSubmodel(productionPlan)
+	 * }
+	 */
+	on ExecutionUpdate [occurrence.message.frame.receiver == this.aas_id] {
+		info("Execution updated with SMC idshort: " + occurrence.message.interactionElements.get(0).idShort)
+		var logEntry = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+		var productLogEntries = aasHelper.getAASChild(productionLog, "ProductLogs") as SubmodelElementList;
+		productLogEntries.value.add(logEntry)
+		aasHelper.updateSubmodel(productionLog)
+		// Final test output
+		var dataobjects : SubmodelElementList = aasHelper.getAASChild(logEntry, "DataObjects") as SubmodelElementList
+		for (dataObject : dataobjects.value) {
+			var dataObjectSMC = dataObject as SubmodelElementCollection
+			for (elem : dataObjectSMC.value) {
+				info("Element received: " + elem.idShort)
+			}
+		}
+	}
+
+	def resetAAS() {
+		info("Reset Production plan of AAS " + aas.idShort)
+		var totalState = aasHelper.getAASChild(productionLog, "Status") as Property;
+		totalState.value = "planned"
+		var processLogs = aasHelper.getAASChild(productionLog, "ProcessLogs") as SubmodelElementList;
+		for (step : processLogs.value) {
+			var stepSMC = step as SubmodelElementCollection
+			var state = aasHelper.getAASChild(stepSMC, "Status") as Property;
+			if (!state.equals("planned")) {
+				state.value = "planned"
+			}
+			var actions = aasHelper.getAASChild(stepSMC, "ActionLogs") as SubmodelElementList;
+			for (action : actions.value) {
+				var actionSMC = action as SubmodelElementCollection
+				var actionState = aasHelper.getAASChild(actionSMC, "Status") as Property;
+				if (!actionState.equals("planned")) {
+					actionState.value = "planned"
+				}
+			}
+		}
+		var productLogEntries = aasHelper.getAASChild(productionLog, "ProductLogs") as SubmodelElementList;
+		productLogEntries.value.clear
+		aasHelper.updateSubmodel(productionLog)
+	}
+
+	def transformHierachicalStep(step : SubmodelElementCollection) : List<SubmodelElementCollection> {
+		var resultSteps : List<SubmodelElementCollection> = new ArrayList<SubmodelElementCollection>
+		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList
+		if (substeps !== null) {
+			for (substep : substeps.value) {
+				var substepSMC = substep as SubmodelElementCollection
+				var subStepId = (aasHelper.getAASChild(substepSMC, "StepId") as Property).value
+				sharedResourceSkill.changeCounter(subStepId, true)
+				resultSteps.addAll(transformHierachicalStep(substepSMC))
+			}
+		}
+		var actions = aasHelper.getAASChild(step, "Actions") as SubmodelElementList
+		if (actions !== null) {
+			resultSteps.add(step)
+		}
+		return resultSteps
+	}
+}

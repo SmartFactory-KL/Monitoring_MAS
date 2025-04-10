@@ -1,0 +1,22 @@
+/** 
+ * 
+ */
+package events
+
+import i40_messages.I40_Message
+
+/** 
+ * @author Alexis bernhard
+ * 
+ */
+event RequestProduction {
+	var message : I40_Message
+	var uc : int
+	new () {}
+}
+
+event ResourceUpdate {
+	var message : I40_Message
+	var uc : int
+	new(){}
+}

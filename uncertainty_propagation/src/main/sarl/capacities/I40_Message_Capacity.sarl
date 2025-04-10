@@ -1,0 +1,19 @@
+/** 
+ * 
+ */
+package capacities
+
+import java.util.List
+import i40_messages.I40_Message
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+capacity I40_Message_Capacity { 
+	
+	def create_I40_Message(sender : String, receiver : String, msg_type : String) : I40_Message 
+	
+	def create_I40_Message(sender : String, receiver : String, msg_type : String, aas_id : String, interactionElements : List<Referable>) : I40_Message
+}

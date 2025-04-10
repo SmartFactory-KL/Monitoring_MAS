@@ -1,0 +1,26 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.Lifecycle
+import io.sarl.core.InnerContextAccess
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+agent AgentSpawner extends AbstractAgent {
+	uses Logging, Lifecycle, InnerContextAccess
+	
+	on Initialize { 
+
+		this.init(occurrence.parameters, null)
+		info("AgentSpawner Initialized.")
+				
+		spawnInContext(ResourceAgent, innerContext, "https://smartfactory.de/assets/d66d8fde-f85d-4104-9fba-a1c25e203a0e")
+		Thread.sleep(6000);
+		spawnInContext(ProductAgent, innerContext, "https://smartfactory.de/assets/65eec615-d8e7-47ba-86b4-022a72d31ec4")
+		
+		info("Spawn process complete.")
+	} 
+}

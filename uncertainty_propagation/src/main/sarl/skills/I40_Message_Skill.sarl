@@ -1,0 +1,30 @@
+/** 
+ * 
+ */
+package skills
+
+import capacities.I40_Message_Capacity
+import java.util.List
+import i40_messages.I40_Message
+import i40_messages.Frame
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+skill I40_Message_Skill implements I40_Message_Capacity {
+	
+	override create_I40_Message(sender : String, receiver : String, msg_type : String) : I40_Message {
+		return new I40_Message(new Frame(sender, receiver, msg_type));
+	}
+	
+	override create_I40_Message(sender : String, receiver : String, msg_type : String, conv_id : String, interactionElements : List<Referable>) : I40_Message {
+		var frame : Frame = new Frame(sender, receiver, msg_type, conv_id); 
+		return new I40_Message(frame, interactionElements);
+	}
+	
+	new() { 
+		
+	}
+}
