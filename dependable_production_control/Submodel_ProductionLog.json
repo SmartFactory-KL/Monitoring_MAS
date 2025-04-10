@@ -1,0 +1,840 @@
+{
+  "idShort": "ProductionLog",
+  "id": "https://template.smartfactory.de/sm/ProductionLog",
+  "semanticId": {
+    "type": "ExternalReference",
+    "keys": [
+      {
+        "type": "GlobalReference",
+        "value": "https://smartfactory.de/semantics/submodel/ProductionLog#1/0"
+      }
+    ]
+  },
+  "submodelElements": [
+    {
+      "idShort": "Status",
+      "valueType": "xs:string",
+      "value": "created",
+      "modelType": "Property"
+    },
+    {
+      "idShort": "ResourceLogs",
+      "value": [
+        {
+          "idShort": "ResourceLogs",
+          "typeValueListElement": "SubmodelElementCollection",
+          "value": [
+            {
+              "value": [
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogId",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "LogId"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "DateTime",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "DateTime"
+                    }
+                  ],
+                  "valueType": "xs:dateTime",
+                  "value": "2024-12-16T10:00:00Z",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogType",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "Log Type"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "Info",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Description",
+                  "valueType": "xs:string",
+                  "value": "MaintenanceScheduled",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "RefResourceAAS",
+                  "value": {
+                    "type": "ModelReference",
+                    "keys": [
+                      {
+                        "type": "AssetAdministrationShell",
+                        "value": "https://template.smartfactory.de/shells/template"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                },
+                {
+                  "idShort": "DataObjects",
+                  "typeValueListElement": "SubmodelElementCollection",
+                  "value": [
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "Maintenance",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Values",
+                          "typeValueListElement": "Property",
+                          "valueTypeListElement": "xs:anyURI",
+                          "value": [
+                            {
+                              "qualifiers": [
+                                {
+                                  "type": "dataformat",
+                                  "valueType": "xs:string",
+                                  "value": "json"
+                                }
+                              ],
+                              "valueType": "xs:anyURI",
+                              "value": "http://localhost:8100/randomData;queryParams=%5Bobject%20Object%5D",
+                              "modelType": "Property"
+                            }
+                          ],
+                          "modelType": "SubmodelElementList"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    },
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "Temperature",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Values",
+                          "typeValueListElement": "SubmodelElement",
+                          "value": [
+                            {
+                              "valueType": "xs:integer",
+                              "value": "32",
+                              "modelType": "Property"
+                            }
+                          ],
+                          "modelType": "SubmodelElementList"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    },
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "MeasurementNoise",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Values",
+                          "typeValueListElement": "SubmodelElement",
+                          "value": [
+                            {
+                              "qualifiers": [
+                                {
+                                  "type": "ValueName",
+                                  "valueType": "xs:string",
+                                  "value": "Variance"
+                                }
+                              ],
+                              "valueType": "xs:double",
+                              "value": "127.788",
+                              "modelType": "Property"
+                            },
+                            {
+                              "qualifiers": [
+                                {
+                                  "type": "ValueName",
+                                  "valueType": "xs:string",
+                                  "value": "Variance"
+                                }
+                              ],
+                              "valueType": "xs:string",
+                              "value": "56.8",
+                              "modelType": "Property"
+                            }
+                          ],
+                          "modelType": "SubmodelElementList"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementList"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "value": [
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogId",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "LogId"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "DateTime",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "DateTime"
+                    }
+                  ],
+                  "valueType": "xs:dateTime",
+                  "value": "2024-12-16T10:00:00Z",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogType",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "Log Type"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "Warn",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Description",
+                  "valueType": "xs:string",
+                  "value": "RisingTemperature",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "RefResourceAAS",
+                  "value": {
+                    "type": "ModelReference",
+                    "keys": [
+                      {
+                        "type": "AssetAdministrationShell",
+                        "value": "https://template.smartfactory.de/shells/template"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                },
+                {
+                  "idShort": "DataObjects",
+                  "typeValueListElement": "SubmodelElementCollection",
+                  "value": [
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "Skill",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Value",
+                          "qualifiers": [
+                            {
+                              "type": "dataformat",
+                              "valueType": "xs:string",
+                              "value": "json"
+                            }
+                          ],
+                          "valueType": "xs:anyURI",
+                          "value": "http://localhost:8100/SkillData;queryParams=%5Bobject%20Object%5D",
+                          "modelType": "Property"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    },
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "Temperature",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Values",
+                          "typeValueListElement": "SubmodelElement",
+                          "value": [
+                            {
+                              "valueType": "xs:integer",
+                              "value": "32",
+                              "modelType": "Property"
+                            }
+                          ],
+                          "modelType": "SubmodelElementList"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementList"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "value": [
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogId",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "LogId"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "DateTime",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "DateTime"
+                    }
+                  ],
+                  "valueType": "xs:dateTime",
+                  "value": "2024-12-16T10:00:00Z",
+                  "modelType": "Property"
+                },
+                {
+                  "category": "CONSTANT",
+                  "idShort": "LogType",
+                  "displayName": [
+                    {
+                      "language": "en",
+                      "text": "Log Type"
+                    }
+                  ],
+                  "valueType": "xs:string",
+                  "value": "fatal",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Description",
+                  "valueType": "xs:string",
+                  "value": "ModuleBreakdown",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "RefResourceAAS",
+                  "value": {
+                    "type": "ModelReference",
+                    "keys": [
+                      {
+                        "type": "AssetAdministrationShell",
+                        "value": "https://template.smartfactory.de/shells/template"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                },
+                {
+                  "idShort": "DataObjects",
+                  "typeValueListElement": "SubmodelElement",
+                  "value": [
+                    {
+                      "value": [
+                        {
+                          "idShort": "DataType",
+                          "valueType": "xs:string",
+                          "value": "FaultLog",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Value",
+                          "valueType": "xs:anyURI",
+                          "value": "http://localhost:8100/FaultLogs?logId=00",
+                          "modelType": "Property"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementList"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            }
+          ],
+          "modelType": "SubmodelElementList"
+        },
+        {
+          "idShort": "FaultLogs",
+          "typeValueListElement": "SubmodelElementCollection",
+          "value": [
+            {
+              "value": [
+                {
+                  "idShort": "Status",
+                  "valueType": "xs:string",
+                  "value": "Behoben",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Severity",
+                  "valueType": "xs:string",
+                  "value": "Kritisch",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "FaultType",
+                  "valueType": "xs:string",
+                  "value": "Hardwarefehler",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "AffectedComponent",
+                  "valueType": "xs:string",
+                  "value": "Motor",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Description",
+                  "valueType": "xs:string",
+                  "value": "\u00DCberhitzt",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "DetectionDateTime",
+                  "valueType": "xs:string",
+                  "value": "2022-07-28 12:13:00",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "ResolutionDateTime",
+                  "valueType": "xs:string",
+                  "value": "2022-07-28 12:19:00",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "RefToData",
+                  "value": {
+                    "type": "ExternalReference",
+                    "keys": [
+                      {
+                        "type": "GlobalReference",
+                        "value": "https://smartfactory.de/database/faultdata"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                },
+                {
+                  "idShort": "RefToResourceLog",
+                  "value": {
+                    "type": "ModelReference",
+                    "keys": [
+                      {
+                        "type": "Submodel",
+                        "value": "https://template.smartfactory.de/sm/ProductionLog"
+                      },
+                      {
+                        "type": "SubmodelElementCollection",
+                        "value": "ResourceLogs"
+                      },
+                      {
+                        "type": "SubmodelElementCollection",
+                        "value": "ResourceLog000003"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                },
+                {
+                  "idShort": "AffectedSkills",
+                  "value": [
+                    {
+                      "idShort": "RefToAffectedSkill0001",
+                      "value": {
+                        "type": "ExternalReference",
+                        "keys": [
+                          {
+                            "type": "GlobalReference",
+                            "value": "Skill_1"
+                          }
+                        ]
+                      },
+                      "modelType": "ReferenceElement"
+                    }
+                  ],
+                  "modelType": "SubmodelElementCollection"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            }
+          ],
+          "modelType": "SubmodelElementList"
+        }
+      ],
+      "modelType": "SubmodelElementCollection"
+    },
+    {
+      "idShort": "ProductLogs",
+      "typeValueListElement": "SubmodelElementCollection",
+      "value": [
+        {
+          "value": [
+            {
+              "idShort": "ProductTitle",
+              "valueType": "xs:string",
+              "modelType": "Property"
+            },
+            {
+              "idShort": "RefProduct",
+              "value": {
+                "type": "ModelReference",
+                "keys": [
+                  {
+                    "type": "AssetAdministrationShell",
+                    "value": "https://smartfactory.de/shells/000"
+                  }
+                ]
+              },
+              "modelType": "ReferenceElement"
+            },
+            {
+              "idShort": "StepTitle",
+              "valueType": "xs:string",
+              "modelType": "Property"
+            },
+            {
+              "idShort": "RefStep",
+              "value": {
+                "type": "ModelReference",
+                "keys": [
+                  {
+                    "type": "Submodel",
+                    "value": "https://template.smartfactory.de/sm/ProductionPlan"
+                  },
+                  {
+                    "type": "SubmodelElementCollection",
+                    "value": "Step00"
+                  }
+                ]
+              },
+              "modelType": "ReferenceElement"
+            },
+            {
+              "idShort": "Status",
+              "valueType": "xs:string",
+              "value": "created",
+              "modelType": "Property"
+            },
+            {
+              "idShort": "ProcessLogs",
+              "value": [
+                {
+                  "idShort": "SchedulingLogs",
+                  "typeValueListElement": "SubmodelElementCollection",
+                  "value": [
+                    {
+                      "value": [
+                        {
+                          "category": "CONSTANT",
+                          "idShort": "LogId",
+                          "displayName": [
+                            {
+                              "language": "en",
+                              "text": "LogId"
+                            }
+                          ],
+                          "valueType": "xs:string",
+                          "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                          "modelType": "Property"
+                        },
+                        {
+                          "category": "CONSTANT",
+                          "idShort": "DateTime",
+                          "displayName": [
+                            {
+                              "language": "en",
+                              "text": "DateTime"
+                            }
+                          ],
+                          "valueType": "xs:dateTime",
+                          "value": "2024-12-16T10:00:00Z",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Description",
+                          "valueType": "xs:string",
+                          "value": "Order started",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "RefResourceAAS",
+                          "value": {
+                            "type": "ModelReference",
+                            "keys": [
+                              {
+                                "type": "AssetAdministrationShell",
+                                "value": "https://template.smartfactory.de/shells/template"
+                              }
+                            ]
+                          },
+                          "modelType": "ReferenceElement"
+                        },
+                        {
+                          "idShort": "DataObjects",
+                          "value": [
+                            {
+                              "idShort": "Object000",
+                              "value": [
+                                {
+                                  "idShort": "DataType",
+                                  "valueType": "xs:string",
+                                  "value": "Job",
+                                  "modelType": "Property"
+                                },
+                                {
+                                  "idShort": "Value",
+                                  "qualifiers": [
+                                    {
+                                      "type": "dataformat",
+                                      "valueType": "xs:string",
+                                      "value": "json"
+                                    }
+                                  ],
+                                  "valueType": "xs:anyURI",
+                                  "value": "http://localhost:8100/randomData;queryParams=%5Bobject%20Object%5D",
+                                  "modelType": "Property"
+                                }
+                              ],
+                              "modelType": "SubmodelElementCollection"
+                            }
+                          ],
+                          "modelType": "SubmodelElementCollection"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementList"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "idShort": "ActionLogs",
+              "typeValueListElement": "SubmodelElementCollection",
+              "value": [
+                {
+                  "value": [
+                    {
+                      "idShort": "ActionId",
+                      "valueType": "xs:string",
+                      "value": "",
+                      "modelType": "Property"
+                    },
+                    {
+                      "idShort": "Status",
+                      "valueType": "xs:string",
+                      "value": "created",
+                      "modelType": "Property"
+                    },
+                    {
+                      "idShort": "ActionReference",
+                      "value": {
+                        "type": "ModelReference",
+                        "keys": [
+                          {
+                            "type": "Submodel",
+                            "value": "https://template.smartfactory.de/sm/ProductionPlan"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "Step00"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "Actions"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "Action00"
+                          }
+                        ]
+                      },
+                      "modelType": "ReferenceElement"
+                    },
+                    {
+                      "idShort": "ProcessLogs",
+                      "value": [
+                        {
+                          "idShort": "SchedulingLogs",
+                          "typeValueListElement": "SubmodelElementCollection",
+                          "value": [
+                            {
+                              "value": [
+                                {
+                                  "category": "CONSTANT",
+                                  "idShort": "LogId",
+                                  "displayName": [
+                                    {
+                                      "language": "en",
+                                      "text": "LogId"
+                                    }
+                                  ],
+                                  "valueType": "xs:string",
+                                  "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                                  "modelType": "Property"
+                                },
+                                {
+                                  "category": "CONSTANT",
+                                  "idShort": "DateTime",
+                                  "displayName": [
+                                    {
+                                      "language": "en",
+                                      "text": "DateTime"
+                                    }
+                                  ],
+                                  "valueType": "xs:dateTime",
+                                  "value": "2024-12-16T10:00:00Z",
+                                  "modelType": "Property"
+                                },
+                                {
+                                  "idShort": "Description",
+                                  "valueType": "xs:string",
+                                  "value": "Order started",
+                                  "modelType": "Property"
+                                },
+                                {
+                                  "idShort": "RefResourceAAS",
+                                  "value": {
+                                    "type": "ModelReference",
+                                    "keys": [
+                                      {
+                                        "type": "AssetAdministrationShell",
+                                        "value": "https://template.smartfactory.de/shells/template"
+                                      }
+                                    ]
+                                  },
+                                  "modelType": "ReferenceElement"
+                                },
+                                {
+                                  "idShort": "DataObjects",
+                                  "typeValueListElement": "SubmodelElement",
+                                  "value": [
+                                    {
+                                      "value": [
+                                        {
+                                          "idShort": "DataType",
+                                          "valueType": "xs:string",
+                                          "value": "Job",
+                                          "modelType": "Property"
+                                        },
+                                        {
+                                          "idShort": "Value",
+                                          "qualifiers": [
+                                            {
+                                              "type": "dataformat",
+                                              "valueType": "xs:string",
+                                              "value": "json"
+                                            }
+                                          ],
+                                          "valueType": "xs:anyURI",
+                                          "value": "http://localhost:8100/randomData;queryParams=%5Bobject%20Object%5D",
+                                          "modelType": "Property"
+                                        }
+                                      ],
+                                      "modelType": "SubmodelElementCollection"
+                                    }
+                                  ],
+                                  "modelType": "SubmodelElementList"
+                                }
+                              ],
+                              "modelType": "SubmodelElementCollection"
+                            }
+                          ],
+                          "modelType": "SubmodelElementList"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementCollection"
+                }
+              ],
+              "modelType": "SubmodelElementList"
+            },
+            {
+              "idShort": "FaultLogs",
+              "typeValueListElement": "SubmodelElementCollection",
+              "value": [
+                {
+                  "value": [
+                    {
+                      "idShort": "RefToFaultLog",
+                      "value": {
+                        "type": "ModelReference",
+                        "keys": [
+                          {
+                            "type": "Submodel",
+                            "value": "https://template.smartfactory.de/sm/ProductionLog"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "ResourceLogs"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "FaultLog0001"
+                          }
+                        ]
+                      },
+                      "modelType": "ReferenceElement"
+                    }
+                  ],
+                  "modelType": "SubmodelElementCollection"
+                }
+              ],
+              "modelType": "SubmodelElementList"
+            }
+          ],
+          "modelType": "SubmodelElementCollection"
+        }
+      ],
+      "modelType": "SubmodelElementList"
+    }
+  ],
+  "modelType": "Submodel"
+}

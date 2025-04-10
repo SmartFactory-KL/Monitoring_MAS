@@ -1,0 +1,360 @@
+{
+  "idShort": "ProductionPlan",
+  "id": "https://template.smartfactory.de/sm/ProductionPlan",
+  "semanticId": {
+    "type": "ExternalReference",
+    "keys": [
+      {
+        "type": "GlobalReference",
+        "value": "https://smartfactory.de/semantics/submodel/ProductionPlan#1/0"
+      }
+    ]
+  },
+  "submodelElements": [
+    {
+      "idShort": "Steps",
+      "typeValueListElement": "SubmodelElementCollection",
+      "value": [
+        {
+          "value": [
+            {
+              "idShort": "StepId",
+              "valueType": "xs:string",
+              "value": "",
+              "modelType": "Property"
+            },
+            {
+              "idShort": "StepTitle",
+              "valueType": "xs:string",
+              "value": "",
+              "modelType": "Property"
+            },
+            {
+              "idShort": "InitialState",
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "idShort": "Substeps",
+              "typeValueListElement": "SubmodelElementCollection",
+              "value": [
+                {
+                  "value": [
+                    {
+                      "idShort": "StepId",
+                      "valueType": "xs:string",
+                      "value": "",
+                      "modelType": "Property"
+                    },
+                    {
+                      "idShort": "StepTitle",
+                      "valueType": "xs:string",
+                      "value": "",
+                      "modelType": "Property"
+                    },
+                    {
+                      "idShort": "Substeps",
+                      "typeValueListElement": "SubmodelElementCollection",
+                      "value": [
+                        {
+                          "value": [
+                            {
+                              "idShort": "StepId",
+                              "valueType": "xs:string",
+                              "value": "",
+                              "modelType": "Property"
+                            }
+                          ],
+                          "modelType": "SubmodelElementCollection"
+                        }
+                      ],
+                      "modelType": "SubmodelElementList"
+                    },
+                    {
+                      "idShort": "Actions",
+                      "typeValueListElement": "SubmodelElementCollection",
+                      "value": [
+                        {
+                          "value": [
+                            {
+                              "idShort": "ActionId",
+                              "valueType": "xs:string",
+                              "value": "",
+                              "modelType": "Property"
+                            },
+                            {
+                              "idShort": "SkillReference",
+                              "value": {
+                                "type": "ModelReference",
+                                "keys": [
+                                  {
+                                    "type": "Submodel",
+                                    "value": "https://template.smartfactory.de/submodel/Skills"
+                                  },
+                                  {
+                                    "type": "SubmodelElementCollection",
+                                    "value": "Skill00"
+                                  }
+                                ]
+                              },
+                              "modelType": "ReferenceElement"
+                            },
+                            {
+                              "idShort": "ProcessLogs",
+                              "value": [
+                                {
+                                  "idShort": "SchedulingLogs",
+                                  "typeValueListElement": "SubmodelElementCollection",
+                                  "value": [
+                                    {
+                                      "value": [
+                                        {
+                                          "category": "CONSTANT",
+                                          "idShort": "LogId",
+                                          "displayName": [
+                                            {
+                                              "language": "en",
+                                              "text": "LogId"
+                                            }
+                                          ],
+                                          "valueType": "xs:string",
+                                          "value": "8e27550bec1aba34dfd9675bc8f29f4e",
+                                          "modelType": "Property"
+                                        },
+                                        {
+                                          "category": "CONSTANT",
+                                          "idShort": "DateTime",
+                                          "displayName": [
+                                            {
+                                              "language": "en",
+                                              "text": "DateTime"
+                                            }
+                                          ],
+                                          "valueType": "xs:dateTime",
+                                          "value": "2024-12-16T10:00:00Z",
+                                          "modelType": "Property"
+                                        },
+                                        {
+                                          "idShort": "Description",
+                                          "valueType": "xs:string",
+                                          "value": "Order started",
+                                          "modelType": "Property"
+                                        },
+                                        {
+                                          "idShort": "RefResourceAAS",
+                                          "value": {
+                                            "type": "ModelReference",
+                                            "keys": [
+                                              {
+                                                "type": "AssetAdministrationShell",
+                                                "value": "https://template.smartfactory.de/shells/template"
+                                              }
+                                            ]
+                                          },
+                                          "modelType": "ReferenceElement"
+                                        },
+                                        {
+                                          "idShort": "DataObjects",
+                                          "typeValueListElement": "SubmodelElement",
+                                          "value": [
+                                            {
+                                              "value": [
+                                                {
+                                                  "idShort": "DataType",
+                                                  "valueType": "xs:string",
+                                                  "value": "Job",
+                                                  "modelType": "Property"
+                                                },
+                                                {
+                                                  "idShort": "Value",
+                                                  "qualifiers": [
+                                                    {
+                                                      "type": "dataformat",
+                                                      "valueType": "xs:string",
+                                                      "value": "json"
+                                                    }
+                                                  ],
+                                                  "valueType": "xs:anyURI",
+                                                  "value": "http://localhost:8100/randomData;queryParams=%5Bobject%20Object%5D",
+                                                  "modelType": "Property"
+                                                }
+                                              ],
+                                              "modelType": "SubmodelElementCollection"
+                                            }
+                                          ],
+                                          "modelType": "SubmodelElementList"
+                                        }
+                                      ],
+                                      "modelType": "SubmodelElementCollection"
+                                    }
+                                  ],
+                                  "modelType": "SubmodelElementList"
+                                }
+                              ],
+                              "modelType": "SubmodelElementCollection"
+                            }
+                          ],
+                          "modelType": "SubmodelElementCollection"
+                        }
+                      ],
+                      "modelType": "SubmodelElementList"
+                    },
+                    {
+                      "idShort": "PlannedProcessTimes",
+                      "value": [
+                        {
+                          "idShort": "PlannedStart",
+                          "valueType": "xs:dateTime",
+                          "value": "2024-12-16T10:00:00Z",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "PlannedEnd",
+                          "valueType": "xs:dateTime",
+                          "value": "2024-12-16T10:05:32Z",
+                          "modelType": "Property"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    },
+                    {
+                      "idShort": "Resource",
+                      "value": [
+                        {
+                          "idShort": "Level",
+                          "valueType": "xs:string",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "Name",
+                          "valueType": "xs:string",
+                          "modelType": "Property"
+                        },
+                        {
+                          "idShort": "ResourceReference",
+                          "value": {
+                            "type": "ModelReference",
+                            "keys": [
+                              {
+                                "type": "AssetAdministrationShell",
+                                "value": "https://smartfactory.de/shells/000"
+                              }
+                            ]
+                          },
+                          "modelType": "ReferenceElement"
+                        }
+                      ],
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementCollection"
+                }
+              ],
+              "modelType": "SubmodelElementList"
+            },
+            {
+              "idShort": "Actions",
+              "typeValueListElement": "SubmodelElementCollection",
+              "value": [
+                {
+                  "value": [
+                    {
+                      "idShort": "ActionTitle",
+                      "valueType": "xs:string",
+                      "value": "",
+                      "modelType": "Property"
+                    },
+                    {
+                      "idShort": "ActionReference",
+                      "value": {
+                        "type": "ModelReference",
+                        "keys": [
+                          {
+                            "type": "Submodel",
+                            "value": "https://smartfactory.de/submodels/000"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "SkillSet"
+                          },
+                          {
+                            "type": "SubmodelElementCollection",
+                            "value": "Skill_000"
+                          }
+                        ]
+                      },
+                      "modelType": "ReferenceElement"
+                    },
+                    {
+                      "idShort": "InputParameters",
+                      "modelType": "SubmodelElementCollection"
+                    },
+                    {
+                      "idShort": "FinalResultData",
+                      "modelType": "SubmodelElementCollection"
+                    }
+                  ],
+                  "modelType": "SubmodelElementCollection"
+                }
+              ],
+              "modelType": "SubmodelElementList"
+            },
+            {
+              "idShort": "FinalState",
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "idShort": "PlannedProcessTimes",
+              "value": [
+                {
+                  "idShort": "PlannedStart",
+                  "valueType": "xs:dateTime",
+                  "value": "2024-12-16T10:00:00Z",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "PlannedEnd",
+                  "valueType": "xs:dateTime",
+                  "value": "2024-12-16T10:05:32Z",
+                  "modelType": "Property"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            },
+            {
+              "idShort": "Resource",
+              "value": [
+                {
+                  "idShort": "Level",
+                  "valueType": "xs:string",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "Name",
+                  "valueType": "xs:string",
+                  "modelType": "Property"
+                },
+                {
+                  "idShort": "ResourceReference",
+                  "value": {
+                    "type": "ModelReference",
+                    "keys": [
+                      {
+                        "type": "AssetAdministrationShell",
+                        "value": "https://smartfactory.de/shells/000"
+                      }
+                    ]
+                  },
+                  "modelType": "ReferenceElement"
+                }
+              ],
+              "modelType": "SubmodelElementCollection"
+            }
+          ],
+          "modelType": "SubmodelElementCollection"
+        }
+      ],
+      "modelType": "SubmodelElementList"
+    }
+  ],
+  "modelType": "Submodel"
+}
