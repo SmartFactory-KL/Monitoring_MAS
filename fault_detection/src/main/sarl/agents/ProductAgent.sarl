@@ -1,0 +1,104 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import events.ExecutionCompleted
+import events.RequestProduction
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import java.util.List
+import java.util.stream.Collectors
+import io.sarl.core.ExternalContextAccess
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import i40_messages.I40_MessageTypes
+import i40_messages.I40_Message
+import java.util.UUID
+import java.util.ArrayList
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+
+/** 
+ * @author Ali Karnoub
+ */
+agent ProductAgent extends AbstractAgent {
+	uses Logging, ExternalContextAccess
+
+	var productionPlan : Submodel
+	var productionLog : Submodel
+
+	def nextStep(lastStepId : String) : SubmodelElementCollection {
+		var steps : List<SubmodelElement> = productionPlan.submodelElements.stream().collect(Collectors.toList());
+		for (step : steps) {
+			var stepList = step as SubmodelElementList
+			for (step2 : stepList.value) {
+				var stepSMC = step2 as SubmodelElementCollection
+				var stepId = stepSMC.getAASElement("StepId") as Property;
+				if (stepId.value.equals(lastStepId)) {
+					if (steps.listIterator.hasNext) {
+						stepSMC = steps.listIterator.next as SubmodelElementCollection
+						return stepSMC;
+					} else {
+						info("Production finished")
+						break;
+					}
+				} else if (lastStepId.equals("startStepId")) {
+					return stepSMC;
+				}
+			}
+		}
+	}
+
+	def executeStep(step : SubmodelElementCollection) {
+		var resourceSMC = step.getAASElement("Resource") as SubmodelElementCollection
+		var resourceReference = resourceSMC.getAASElement("ResourceReference") as ReferenceElement;
+		var resourceId : String = resourceReference.value.keys.get(0).value.toString()
+		var interactionElements : List<Referable> = new ArrayList<Referable>()
+		interactionElements.add(step)
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
+			I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
+		emit(this.comspace, new RequestProduction => [message = new_message])
+	}
+
+	on Initialize {
+		if (this.init(occurrence.parameters, "Product")) {
+			productionPlan = aasHelper.getSubmodelByIdShort(aas, "ProductionPlan")
+			productionLog = aasHelper.getSubmodelByIdShort(aas, "ProductionLog")
+			resetAAS();
+			executeStep(nextStep("startStepId"))
+			info("Initialization process of product AAS " + aas.idShort + " completed.")
+		}
+	}
+
+	on ExecutionCompleted {
+		executeStep(nextStep(occurrence.actionID))
+	}
+
+	// tbd remove log entries
+	def resetAAS() {
+		info("Reset Production plan of AAS " + aas.idShort)
+		var totalState = productionLog.submodelElements.stream().filter([sme|sme.getIdShort().contains("Status")]).
+			findFirst().get() as Property;
+		totalState.value = "planned"
+		var processLogs = productionLog.submodelElements.stream().
+			filter([sme|sme.getIdShort().contains("ProcessLogs")]).findFirst().get() as SubmodelElementList;
+		for (step : processLogs.value) {
+			var stepSMC = step as SubmodelElementCollection
+			var state = stepSMC.getAASElement("Status") as Property;
+			if (!state.equals("planned")) {
+				state.value = "planned"
+				aasHelper.updateSubmodel(productionPlan);
+				var actions = stepSMC.getAASElement("ActionLogs") as SubmodelElementList;
+				for (action : actions.value) {
+					var actionSMC = action as SubmodelElementCollection
+					var actionState = actionSMC.getAASElement("Status") as Property;
+					if (!actionState.equals("planned")) {
+						actionState.value = "planned"
+						aasHelper.updateSubmodel(productionPlan);
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,147 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.Lifecycle
+import io.sarl.core.DefaultContextInteractions
+import events.RequestProduction
+import java.util.Map
+import java.time.OffsetDateTime;
+import java.util.HashMap
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import skills.UncertaintyEstimatorSkill
+import capacities.UncertaintyEstimatorCapacity
+import org.eclipse.digitaltwin.aas4j.v3.model.Entity
+import org.eclipse.digitaltwin.aas4j.v3.model.EntityType
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import events.ExecutionUpdate
+import io.sarl.core.ExternalContextAccess
+import i40_messages.I40_MessageTypes
+import i40_messages.I40_Message
+import java.util.UUID
+import java.util.List
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import java.util.ArrayList
+import org.eclipse.digitaltwin.aas4j.v3.model.impl.DefaultProperty
+import helper.AasGenerator
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import org.eclipse.digitaltwin.aas4j.v3.model.DataTypeDefXsd;
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceTypes;
+import org.eclipse.digitaltwin.aas4j.v3.model.KeyTypes
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+@SuppressWarnings("discouraged_occurrence_readonly_use")
+agent ResourceAgent extends AbstractAgent {
+	uses Logging, Lifecycle, DefaultContextInteractions, ExternalContextAccess
+
+	var estimateUncertaintySkill : UncertaintyEstimatorSkill
+
+	var skillSM : Submodel
+	var aasgen : AasGenerator
+
+	var bom : Submodel
+	var skills : Map<String, String>
+
+	def spawnSubAgents() {
+		bom = aasHelper.getSubmodelByIdShort(aas, "BillOfMaterial")
+		var resource_holon = bom.submodelElements.stream().findFirst().get()
+		if (!(resource_holon instanceof Entity)) {
+			warning("On the top level of the bom of AAS " + aas.idShort +
+				" a single entity of the resource represented by the AAS is expected.")
+			return
+		}
+		var resource_holon_entity = resource_holon as Entity
+		if (resource_holon_entity.statements.size < 1) {
+			info("The topology of the resource AAS " + aas.idShort + " does not contain any agent.")
+		}
+		for (resource : resource_holon_entity.statements) {
+			var resource_Entity = resource as Entity
+			var globalAssetId : String = resource_Entity.globalAssetId
+			if (resource_Entity.entityType != EntityType.SELF_MANAGED_ENTITY) {
+				info("The entity " + resource_Entity.idShort + " in the bom of resource " + resource_holon.idShort +
+					"is co-managed and no AAS is searched.")
+			} else if (globalAssetId === null) {
+				warning("Warning the global asset id of the resource " + resource_Entity.idShort + " is null.")
+			} else {
+				info("GlobalAssetId:" + globalAssetId)
+				spawnInContext(ResourceAgent, defaultContext, globalAssetId)
+			}
+		}
+	} 
+
+	on Initialize {
+		if (this.init(occurrence.parameters, "Resource")) {
+			this.spawnSubAgents()
+			aasgen = new AasGenerator()
+
+			estimateUncertaintySkill = new UncertaintyEstimatorSkill()
+			setSkill(estimateUncertaintySkill, UncertaintyEstimatorCapacity)
+
+			skillSM = aasHelper.getSubmodelByIdShort(aas, "Skills")
+			if (skillSM != null)
+				loadSkills()
+			info("Initializing CC Agent completed. AAS_id: " + aas_id)
+		}
+	}
+
+	on RequestProduction [occurrence.message.frame.receiver == this.aas_id] {
+		var step = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+		var result : double[] = estimateUncertaintySkill.calculateUncertainty(step)
+		info("Resulting distributed uncertainty: [" + result.get(0) + ", " + result.get(1) + ", " + result.get(2) + "]")
+		
+		var interactionElements : List<Referable> = new ArrayList<Referable>()
+		var dataObjectLogList : List<SubmodelElement> = new ArrayList<SubmodelElement>()
+		dataObjectLogList.add(arrayToSMC(result))
+		interactionElements.add(generateLogEntry(OffsetDateTime.now().toString, "Info", "UncertaintyCalculated", dataObjectLogList))
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, occurrence.message.frame.sender,
+			I40_MessageTypes.INFORMING, occurrence.message.frame.conversationID, interactionElements)
+		emit(this.comspace, new ExecutionUpdate => [message = new_message])
+	}
+
+	def loadSkills() {
+		skills = new HashMap<String, String>()
+		var skillList : SubmodelElementList = skillSM.submodelElements.stream().filter([ smc |
+			smc.getIdShort().contains("SkillSet")
+		]).findFirst().get() as SubmodelElementList;
+		for (resskill : skillList.value) {
+			var resskillSMC = resskill as SubmodelElementCollection
+			var buffer : String = ""
+			for (skillEntry : resskillSMC.value) {
+				if (skillEntry instanceof Property) {
+					if (skillEntry.idShort.equals("SkillId")) {
+						buffer = skillEntry.value
+					} else if (skillEntry.idShort.equals("SkillName")) {
+						skills.put(buffer, skillEntry.value)
+					}
+				}
+			}
+		}
+	}
+	
+	def arrayToSMC(array : double[]) : SubmodelElementCollection {
+		var elements = new ArrayList<SubmodelElement>();
+		elements.add(aasgen.createProperty("Mean", DataTypeDefXsd.DOUBLE, array.get(0).toString))
+		elements.add(aasgen.createProperty("Variance", DataTypeDefXsd.DOUBLE, array.get(1).toString))
+		elements.add(aasgen.createProperty("Weight", DataTypeDefXsd.DOUBLE, array.get(2).toString))
+		return aasgen.createSMC("UncertaintyResult", elements)
+	}
+	
+	def generateLogEntry(dateTime : String, logType : String, description : String, dataObjects : List<SubmodelElement>) : SubmodelElementCollection {
+		var logEntryElems = new ArrayList<SubmodelElement>()
+		logEntryElems.add(aasgen.createProperty("LogId", DataTypeDefXsd.STRING, UUID.randomUUID().toString))
+		logEntryElems.add(aasgen.createProperty("DateTime", DataTypeDefXsd.DATE_TIME, dateTime))
+		logEntryElems.add(aasgen.createProperty("LogType", DataTypeDefXsd.STRING, logType))
+		logEntryElems.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING, description))
+		var refKeys : Map<KeyTypes, String> = new HashMap<KeyTypes, String>()
+		refKeys.put(KeyTypes.ASSET_ADMINISTRATION_SHELL, this.aas_id)
+		logEntryElems.add(aasgen.createReferenceElement("RefResourceAAS", ReferenceTypes.MODEL_REFERENCE, refKeys))
+		logEntryElems.add(aasgen.createSML("DataObjects", dataObjects))
+		return aasgen.createSMC("LogEntry", logEntryElems)
+	}
+}

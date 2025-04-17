@@ -1,0 +1,73 @@
+/** 
+ * 
+ */
+package agents
+
+import io.sarl.core.OpenEventSpace
+import io.sarl.core.DefaultContextInteractions
+import java.util.UUID
+import io.sarl.core.OpenEventSpaceSpecification
+import io.sarl.core.Behaviors
+import helper.AasHelper
+import skills.I40_Message_Skill
+import capacities.I40_Message_Capacity
+import io.sarl.core.Logging
+import org.eclipse.digitaltwin.aas4j.v3.model.AssetAdministrationShell
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import java.util.NoSuchElementException
+
+/** 
+ * @author Alexis Bernhard
+ * 
+ */
+agent AbstractAgent {
+	uses DefaultContextInteractions, Behaviors, Logging
+
+	var package comspace : OpenEventSpace
+	var package message_skill : I40_Message_Skill
+
+	var package aasHelper : AasHelper
+	var package aas : AssetAdministrationShell
+	var package aas_id : String
+
+	new(parentID : UUID, agentID : UUID) {
+		super(parentID, agentID)
+	}
+
+	@SuppressWarnings("potential_field_synchronization_problem")
+	def init(parameters : Object[], assetType : String) : boolean {
+		this.aasHelper = new AasHelper()
+		this.aas_id = null
+		if (parameters.size > 0 && assetType !== null) {
+			aas = aasHelper.getAASbyglobalAssetID(parameters.get(0).toString, assetType)
+			if (aas === null) {
+				warning("The AAS with global asset id " + parameters.get(0).toString +
+					" could not be found. The agent is not initialized.")
+				return false;
+			}
+			aas_id = aas.id
+		}
+		if (parameters.size > 1) {
+			this.comspace = (parameters.get(1) as OpenEventSpace)
+			this.comspace.registerWeakParticipant(asEventListener())
+		} else {
+			comspace = defaultContext.getOrCreateSpaceWithSpec(typeof(OpenEventSpaceSpecification), this.ID as UUID)
+			comspace.registerWeakParticipant(asEventListener())
+		}
+
+		message_skill = new I40_Message_Skill()
+		setSkill(message_skill, I40_Message_Capacity)
+		return true;
+	}
+	
+	def getAASElement(smc : SubmodelElementCollection, idShort : String) : SubmodelElement {
+		try {
+			var result = smc.getValue().stream().filter([sme|sme.getIdShort().contains(idShort)]).findFirst().get()
+			return result
+		} catch (e : NoSuchElementException) {
+			warning("The AAS element " + idShort + " could not be found in smc " + smc.idShort)
+		}
+		return null;
+	}
+}

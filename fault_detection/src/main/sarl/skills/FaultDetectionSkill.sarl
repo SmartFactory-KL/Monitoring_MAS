@@ -1,0 +1,426 @@
+package skills
+
+import capacities.FaultDetectionCapacity
+import io.sarl.core.Logging
+import java.util.List
+import java.util.ArrayList
+import java.util.NoSuchElementException
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import org.eclipse.digitaltwin.aas4j.v3.model.AssetAdministrationShell
+import helper.AasHelper
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import helper.AasGenerator
+import org.eclipse.digitaltwin.aas4j.v3.model.DataTypeDefXsd
+import java.time.OffsetDateTime
+import java.util.UUID
+import java.util.Map
+import org.eclipse.digitaltwin.aas4j.v3.model.KeyTypes
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceTypes
+import org.eclipse.digitaltwin.aas4j.v3.model.impl.DefaultReferenceElement
+import java.util.HashMap
+
+/** 
+ * @author Ali Karnoub
+ */
+skill FaultDetectionSkill implements FaultDetectionCapacity {
+	uses Logging
+
+	var aasgen : AasGenerator = new AasGenerator
+	var aasHelper : AasHelper = new AasHelper
+
+	// == Set simulation flags manually here ==
+	val simulateEmptyStorage = true
+	val simulateNotEmptyShuttle = true
+
+	public var isAborted : boolean = false
+
+	/** 
+	 * Calculates the fault probability according to Bayes: \( P(F_i | D_i) \).
+	 */
+	 def calculateFaultProbability(likelihood : Double, prior : Double, evidence : Double) : Double {
+		if (evidence == 0.0) {
+			warning("(P(D_i) must not be 0).")
+        return 0.0 as Double
+		}
+    return ((likelihood * prior) / evidence) as Double
+	}
+
+	/** 
+	 * Calculates the total fault probability of a hierarchical system.
+	 */
+	 def calculateSystemFaultProbability(faultProbabilities : List<Double>) : Double {
+		if(faultProbabilities.isEmpty) return 0.0 as Double;
+		var systemFault = 1.0;
+		for (prob : faultProbabilities) {
+			systemFault *= (1 - prob);
+		}
+		return (1 - systemFault) as Double;
+	}
+
+	/** 
+	 * Detects faults based on sensor data from the sensor values
+	 */ 
+	 @SuppressWarnings("potential_field_synchronization_problem")
+		def detectFaults(productionLog : Submodel, aas : AssetAdministrationShell, substepSMC: SubmodelElementCollection) : List<Referable> {
+
+		val faultLogs = new ArrayList<Referable>()
+		
+
+		// === Define AAS to simulate faults ===
+		val AAS1 = "https://smartfactory.de/shells/7b2e23f8-d645-4fa2-8124-459e9fcba01a" // Assembly
+		val AAS2 = "https://smartfactory.de/shells/34729a69-938c-4456-8eb6-212f9a7d8063" // Transport
+		val aasId = aas.id
+		var aasMode = ""
+
+		if (aasId == AAS1) {
+			aasMode = "assembly"
+		} else if (aasId == AAS2) {
+			aasMode = "transport"
+		} else {
+			return faultLogs
+		}
+
+		// === Get ResourceLogs from AAS
+		var resourceLogsWrapper = productionLog.submodelElements.findFirst [
+			it instanceof SubmodelElementCollection && it.idShort == "ResourceLogs"
+		] as SubmodelElementCollection
+
+		if (resourceLogsWrapper === null) {
+			resourceLogsWrapper = aasgen.createSMC("ResourceLogs")
+			productionLog.submodelElements.add(resourceLogsWrapper)
+		}
+
+		var resourceLogsList = resourceLogsWrapper.getAASElement("ResourceLogs") as SubmodelElementList
+		if (resourceLogsList === null) {
+			resourceLogsList = aasgen.createSML("ResourceLogs", new ArrayList)
+			resourceLogsWrapper.value.add(resourceLogsList)
+		}
+
+		// === Generate ResourceLogs and FaultLogs (simulation) ===
+		if (simulateEmptyStorage && aasMode == "assembly") {
+			simulateResourceLog(productionLog, resourceLogsWrapper, resourceLogsList, "assembly", aas.id)
+		}
+
+		if (simulateNotEmptyShuttle && aasMode == "transport") {
+			simulateResourceLog(productionLog, resourceLogsWrapper, resourceLogsList, "transport", aas.id)
+		}
+
+		val skills = extractSkillReferences(substepSMC)
+
+		// == Generate and upload FaultLogs from simulated ResourceLogs==
+		val generatedFaults = analyzeLogsAndGenerateFaults(resourceLogsList, resourceLogsWrapper, productionLog,
+			aasMode, skills)
+		faultLogs.addAll(generatedFaults)
+
+		val containsFatal = resourceLogsList.value.exists [
+			it instanceof SubmodelElementCollection &&
+				((getAASElement(it as SubmodelElementCollection, "LogType") as Property)?.value?.toLowerCase == "fatal")
+		]
+
+		if (containsFatal) {isAborted = true}
+
+		val faultLogsSML = (productionLog.submodelElements.findFirst [
+			it instanceof SubmodelElementCollection && it.idShort == "ResourceLogs"
+		] as SubmodelElementCollection)?.getAASElement("FaultLogs") as SubmodelElementList
+
+		if (faultLogsSML === null || faultLogsSML.value.empty) {
+			info("No FaultLogs included in the ProductionLog.")
+		} else {
+			for (elem : faultLogsSML.value) {
+				if (elem instanceof SubmodelElementCollection) {
+					val smc = elem as SubmodelElementCollection
+					val faultType = (getAASElement(smc, "FaultType") as Property)?.value ?: "?"
+					val description = (getAASElement(smc, "Description") as Property)?.value ?: "?"
+					info("[FaultLog]: " + faultType + " – " + description)
+		}
+	}
+	}
+
+
+	return faultLogs
+}
+
+	// == Classify Faults
+	 def classifyFaults(
+		ownFaultLogs : List<Referable>,
+		previousFaultLogs : List<Referable>) 
+		{
+		val combinedLogs = new ArrayList<Referable>()
+		combinedLogs.addAll(ownFaultLogs)
+
+		if (previousFaultLogs !== null && !previousFaultLogs.empty) {
+			combinedLogs.addAll(previousFaultLogs)
+		}
+
+		val total = combinedLogs.size
+		if (total == 0) {
+			info("No FaultLogs available for classification.")
+		return
+		}
+
+		val groupedCounts = new HashMap<String, Integer>()
+
+		for (log : combinedLogs.filter[it instanceof SubmodelElementCollection]) {
+			val smc = log as SubmodelElementCollection
+			val faultType = (getAASElement(smc, "FaultType") as Property)?.value
+			if (faultType !== null) {
+				val current = groupedCounts.getOrDefault(faultType, 0)
+				groupedCounts.put(faultType, current + 1)
+			}
+		}
+
+		var maxType = ""
+		var maxProb = -1.0
+
+		for (log : combinedLogs.filter[it instanceof SubmodelElementCollection]) {
+			val smc = log as SubmodelElementCollection
+			val faultType = (getAASElement(smc, "FaultType") as Property)?.value
+			if (faultType !== null) {
+				val count = groupedCounts.getOrDefault(faultType, 0)
+				val evidence = count.toDouble / total
+
+				val likelihood = switch faultType {
+				case "sensorFault": 0.8
+					case "shuttleOccupied": 0.6
+					case "missingProduct": 0.9
+					default: 0.5
+				}
+				val prior = 0.5
+				val prob = calculateFaultProbability(likelihood, prior, evidence)
+
+				info(faultType + ": " + prob)
+
+				if (prob > maxProb) {
+					maxProb = prob
+					maxType = faultType
+				}
+			}
+		}
+
+	info("→ Classified as: " + maxType)
+	}
+
+	// == Add simulated ResourceLogs==
+	private def simulateResourceLog(
+		productionLog : Submodel,
+		resourceLogsWrapper : SubmodelElementCollection,
+		resourceLogsList : SubmodelElementList,
+		aasMode : String,
+		aasId : String
+	) {
+		val fakeLogId = UUID.randomUUID.toString
+		val simulatedLog = switch aasMode {
+			case "assembly": generateSimulatedLog(fakeLogId, "emptyStorage", "fatal", aasId)
+			case "transport": generateSimulatedLog(fakeLogId, "notEmptyShuttle", "error", aasId)
+			default: null
+		}
+
+		if (simulatedLog !== null) {
+			resourceLogsList.value.add(simulatedLog)
+			info("Simulated ResourceLog added: " + fakeLogId)
+
+			try {
+				aasHelper.updateSubmodel(productionLog)
+			} catch (e : Exception) {
+				warning("Error while uploading the ResourceLogs: " + e.message)
+		}
+	}
+}
+
+	// == Anaysze ResourceLogs and Generate FaultLogs==
+	private def analyzeLogsAndGenerateFaults(
+		logsList : SubmodelElementList,
+		resourceLogsWrapper : SubmodelElementCollection,
+		productionLog : Submodel,
+		aasMode : String,
+		skills : List<ReferenceElement>
+	) : List<Referable> {
+
+		val generatedFaults = new ArrayList<Referable>()
+
+		for (entry : logsList.value) {
+			if (entry instanceof SubmodelElementCollection) {
+				val log = entry as SubmodelElementCollection
+				val logType = (getAASElement(log, "LogType") as Property)?.value?.toLowerCase
+				val description = (getAASElement(log, "Description") as Property)?.value?.toLowerCase
+				val logId = (getAASElement(log, "LogId") as Property)?.value
+
+				if ((logType == "error" || logType == "fatal") && description !== null && logId !== null) {
+					info("Found ResourceLog: " + logId + " – " + description)
+
+					switch aasMode {
+					case "assembly": {
+							if (description.contains("emptystorage")) {
+								generatedFaults.add(generateSensorFault2(logId, skills))
+								generatedFaults.add(generateMissingProductFault(logId, skills))
+							}
+						}
+						case "transport": {
+							if (description.contains("notemptyshuttle")) {
+								generatedFaults.add(generateSensorFault(logId, skills))
+								generatedFaults.add(generateShuttleFullFault(logId, skills))
+							}
+					}
+					}
+				}
+			}
+		}
+		var faultLogsSML = resourceLogsWrapper.getAASElement("FaultLogs") as SubmodelElementList
+		if (faultLogsSML === null) {
+		faultLogsSML = aasgen.createSML("FaultLogs", new ArrayList)
+			resourceLogsWrapper.value.add(faultLogsSML)
+		}
+		faultLogsSML.value.addAll(generatedFaults.filter[it instanceof SubmodelElement].map[it as SubmodelElement])
+		try {
+			aasHelper.updateSubmodel(productionLog)
+		} catch (e : Exception) {
+			warning("Error while uploading the FaultLogs: " + e.message)
+	}
+
+	return generatedFaults
+}
+
+	// == Auxiliary method for Skill references==
+	private def extractSkillReferences(substepSMC : SubmodelElementCollection) : List<ReferenceElement> {
+	val skillRefs = new ArrayList<ReferenceElement>()
+
+	val actions = substepSMC.value.findFirst [
+		it instanceof SubmodelElementList && it.idShort == "Actions"
+	] as SubmodelElementList
+
+	if (actions !== null) {
+		for (actionEntry : actions.value) {
+			if (actionEntry instanceof SubmodelElementCollection) {
+				val skills = (actionEntry as SubmodelElementCollection).value.findFirst [
+					it instanceof ReferenceElement && it.idShort == "SkillReference"
+				] as ReferenceElement
+
+				if (
+
+			skills !== null) {
+			skillRefs.add(skills)
+				}
+			}
+		}
+	}
+	return skillRefs
+}
+
+	// == Generate ResourceLogs==
+	private def generateSimulatedLog(logId : String, description : String, logType : String,
+		aasId : String) : SubmodelElementCollection {
+		val elements = new ArrayList<SubmodelElement>()
+		elements.add(aasgen.createProperty("LogId", DataTypeDefXsd.STRING, logId))
+		elements.add(aasgen.createProperty("DateTime", DataTypeDefXsd.DATE_TIME, OffsetDateTime.now.toString))
+		elements.add(aasgen.createProperty("LogType", DataTypeDefXsd.STRING, logType))
+		elements.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING, description))
+		val refMap = Map.of(KeyTypes.ASSET_ADMINISTRATION_SHELL, aasId)
+		elements.add(aasgen.createReferenceElement("RefResourceAAS", ReferenceTypes.MODEL_REFERENCE, refMap))
+		val dataObjects = new ArrayList<SubmodelElement>()
+		dataObjects.add(aasgen.createProperty("DataType", DataTypeDefXsd.STRING, "SensorValue"))
+		dataObjects.add(aasgen.createProperty("Value", DataTypeDefXsd.BOOLEAN, "false"))
+		val dataObjectsSMC = aasgen.createSMC("Object000", dataObjects)
+		val dataObjectsSML = aasgen.createSML("DataObjects", List.of(dataObjectsSMC))
+		elements.add(dataObjectsSML)
+		return aasgen.createSMC("ResourceLog_" + logId, elements)
+	}
+
+	// == Generate FaultLogs ==
+	private def generateShuttleFullFault(logId : String, skills : List<ReferenceElement>) : SubmodelElementCollection {
+		val elements = new ArrayList<SubmodelElement>()
+		elements.add(aasgen.createProperty("Status", DataTypeDefXsd.STRING, "open"))
+		elements.add(aasgen.createProperty("Severity", DataTypeDefXsd.STRING, "high"))
+		elements.add(aasgen.createProperty("FaultType", DataTypeDefXsd.STRING, "shuttleOccupied"))
+		elements.add(aasgen.createProperty("AffectedComponent", DataTypeDefXsd.STRING, "TransportModule"))
+		elements.add(
+			aasgen.createProperty("Description", DataTypeDefXsd.STRING, "Shuttle is occupied"))
+		elements.add(aasgen.createProperty("DetectionDateTime", DataTypeDefXsd.DATE_TIME, OffsetDateTime.now.toString))
+		val skillSMC = aasgen.createSMC("AffectedSkills")
+		for (i : 0 ..< skills.size) {
+			val original = skills.get(i)
+			val refElem = new DefaultReferenceElement
+			refElem.idShort = "RefToAffectedSkill" + (i + 1)
+			refElem.value = original.value
+			skillSMC.value.add(refElem)
+		}
+		elements.add(skillSMC)
+		return aasgen.createSMC("FaultLog_ShuttleFull_" + logId, elements)
+}
+
+	private def generateSensorFault(logId : String, skills : List<ReferenceElement>) : SubmodelElementCollection {
+		val elements = new ArrayList<SubmodelElement>()
+		elements.add(aasgen.createProperty("Status", DataTypeDefXsd.STRING, "open"))
+		elements.add(aasgen.createProperty("Severity", DataTypeDefXsd.STRING, "medium"))
+		elements.add(aasgen.createProperty("FaultType", DataTypeDefXsd.STRING, "sensorFault"))
+		elements.add(aasgen.createProperty("AffectedComponent", DataTypeDefXsd.STRING, "TransportModule"))
+		elements.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING,
+			"Sensor is faulty"))
+		elements.add(aasgen.createProperty("DetectionDateTime", DataTypeDefXsd.DATE_TIME, OffsetDateTime.now.toString))
+		val skillSMC = aasgen.createSMC("AffectedSkills")
+		for (i : 0 ..< skills.size) {
+			val original = skills.get(i)
+			val refElem = new DefaultReferenceElement
+			refElem.idShort = "RefToAffectedSkill" + (i + 1)
+			refElem.value = original.value
+			skillSMC.value.add(refElem)
+		}
+		elements.add(skillSMC)
+		return aasgen.createSMC("FaultLog_SensorFailure_" + logId, elements)
+	}
+
+	private def generateSensorFault2(logId : String, skills : List<ReferenceElement>) : SubmodelElementCollection {
+		val elements = new ArrayList<SubmodelElement>()
+		elements.add(aasgen.createProperty("Status", DataTypeDefXsd.STRING, "open"))
+		elements.add(aasgen.createProperty("Severity", DataTypeDefXsd.STRING, "medium"))
+		elements.add(aasgen.createProperty("FaultType", DataTypeDefXsd.STRING, "sensorFault"))
+		elements.add(aasgen.createProperty("AffectedComponent", DataTypeDefXsd.STRING, "AssembleModule"))
+		elements.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING, "Sensor is faulty"))
+		elements.add(aasgen.createProperty("DetectionDateTime", DataTypeDefXsd.DATE_TIME, OffsetDateTime.now.toString))
+		val skillSMC = aasgen.createSMC("AffectedSkills")
+		for (i : 0 ..< skills.size) {
+			val original = skills.get(i)
+			val refElem = new DefaultReferenceElement
+			refElem.idShort = "RefToAffectedSkill" + (i + 1)
+			refElem.value = original.value
+			skillSMC.value.add(refElem)
+		}
+		elements.add(skillSMC)
+		return aasgen.createSMC("FaultLog_SensorFailure_" + logId, elements)
+	}
+
+	private def generateMissingProductFault(logId : String, skills : List<ReferenceElement>) : SubmodelElementCollection {
+		val elements = new ArrayList<SubmodelElement>()
+		elements.add(aasgen.createProperty("Status", DataTypeDefXsd.STRING, "open"))
+		elements.add(aasgen.createProperty("Severity", DataTypeDefXsd.STRING, "high"))
+		elements.add(aasgen.createProperty("FaultType", DataTypeDefXsd.STRING, "missingProduct"))
+		elements.add(aasgen.createProperty("AffectedComponent", DataTypeDefXsd.STRING, "AssemblyModule"))
+		elements.add(aasgen.createProperty("Description", DataTypeDefXsd.STRING,
+			"Product is missing"))
+		elements.add(aasgen.createProperty("DetectionDateTime", DataTypeDefXsd.DATE_TIME, OffsetDateTime.now.toString))
+		val skillSMC = aasgen.createSMC("AffectedSkills")
+		for (i : 0 ..< skills.size) {
+			val original = skills.get(i)
+			val refElem = new DefaultReferenceElement
+			refElem.idShort = "RefToAffectedSkill" + (i + 1)
+			refElem.value = original.value
+			skillSMC.value.add(refElem)
+		}
+		elements.add(skillSMC)
+		return aasgen.createSMC("FaultLog_MissingProduct_" + logId, elements)
+}
+
+	// === Auxiliary method ===
+	private def getAASElement(smc : SubmodelElementCollection, idShort : String) : SubmodelElement {
+		try {
+			return smc.getValue().stream().filter([sme|sme.getIdShort().equals(idShort)]).findFirst().get()
+		} catch (e : NoSuchElementException) {
+			warning("AAS-Element '" + idShort + "' not found in '" + smc.idShort + "'")
+			return null
+		}
+	}
+}

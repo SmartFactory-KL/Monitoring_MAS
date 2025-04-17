@@ -1,0 +1,335 @@
+package agents
+
+import io.sarl.core.Initialize
+import io.sarl.core.Logging
+import io.sarl.core.Lifecycle
+import io.sarl.core.DefaultContextInteractions
+import events.RequestProduction
+import java.util.Map
+import java.util.HashMap
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Property
+import skills.FaultDetectionSkill
+import capacities.FaultDetectionCapacity
+import org.eclipse.digitaltwin.aas4j.v3.model.Entity
+import org.eclipse.digitaltwin.aas4j.v3.model.EntityType
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
+import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceElement
+import io.sarl.core.ExternalContextAccess
+import i40_messages.I40_MessageTypes
+import i40_messages.I40_Message
+import java.util.UUID
+import java.util.List
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+import java.util.ArrayList
+import helper.AasGenerator
+import java.util.HashSet
+import java.util.Set
+import events.ResourceUpdate
+import events.FaultLogBroadcast
+
+/** 
+ * @author Ali Karnoub
+ * 
+ */
+ 
+enum FaultDetectionMode {
+	HIERARCHICAL,
+	HETERARCHICAL
+}
+
+@SuppressWarnings("discouraged_occurrence_readonly_use")
+agent ResourceAgent extends AbstractAgent {
+	uses Logging, Lifecycle, DefaultContextInteractions, ExternalContextAccess
+
+	var detectFaultSkill : FaultDetectionSkill
+//	var detectionMode : FaultDetectionMode = FaultDetectionMode.HETERARCHICAL
+	var detectionMode : FaultDetectionMode = FaultDetectionMode.HIERARCHICAL
+
+	var skillSM : Submodel
+	var aasgen : AasGenerator
+
+	var bom : Submodel
+	var skills : Map<String, String>
+
+	var isCentralAgent : boolean = false
+	val CentralAAS = "https://smartfactory.de/shells/99c880df-d65a-4180-8b19-aa73e4a826d8"
+
+	var faultLogBuffer : Map<String, List<SubmodelElementCollection>> = new HashMap
+
+	// Spawn SubAgents
+	def spawnSubAgents() {
+		bom = aasHelper.getSubmodelByIdShort(aas, "BillOfMaterial")
+		var resource_holon = bom.submodelElements.stream().findFirst().get()
+		if (!(resource_holon instanceof Entity)) {
+			warning("On the top level of the bom of AAS " + aas.idShort +
+				" a single entity of the resource represented by the AAS is expected.")
+			return
+		}
+		var resource_holon_entity = resource_holon as Entity
+		if (resource_holon_entity.statements.size < 1) {
+			info("The topology of the resource AAS " + aas.idShort + " does not contain any agent.")
+		}
+		
+		for (resource : resource_holon_entity.statements) {
+			var resource_Entity = resource as Entity
+			var globalAssetId : String = resource_Entity.globalAssetId
+			if (resource_Entity.entityType != EntityType.SELF_MANAGED_ENTITY) {
+				info("The entity " + resource_Entity.idShort + " in the bom of resource " + resource_holon.idShort +
+					"is co-managed and no AAS is searched.")
+			} else if (globalAssetId === null) {
+				warning("Warning the global asset id of the resource " + resource_Entity.idShort + " is null.")
+			} else {
+				info("GlobalAssetId:" + globalAssetId)
+				spawnInContext(ResourceAgent, defaultContext, globalAssetId)
+			}
+		}
+	}
+
+	// Initialize
+	on Initialize {
+		if (this.init(occurrence.parameters, "Resource")) {
+			this.isCentralAgent = (aas_id == CentralAAS)
+			this.spawnSubAgents()
+			aasgen = new AasGenerator()
+
+			detectFaultSkill = new FaultDetectionSkill()
+			setSkill(detectFaultSkill, FaultDetectionCapacity)
+
+			info("Initializing CC Agent completed. AAS_id: " + aas_id)
+			resetAAS
+		}
+	}
+
+	var pendingSubsteps : List<SubmodelElementCollection> = new ArrayList
+	var currentStepConversationId : String = ""
+
+	// Incoming Message "StepSMC" from ProductAgent or Incoming "SubstepSMC" from CentralAgent (ResourceAgent Level 0)
+	on RequestProduction [occurrence.message.frame.receiver == this.aas_id] {
+
+		// Incoming Message "StepSMC" is analyzed and the Substeps are communicated to the corresponding agents
+		if (this.isCentralAgent) {
+
+			val step = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+			currentStepConversationId = occurrence.message.frame.conversationID
+
+			val substeps = step.value.findFirst [
+				it instanceof SubmodelElementList && it.idShort == "Substeps"
+			] as SubmodelElementList
+
+			if (substeps !== null) {
+				for (substep : substeps.value) {
+					if (substep instanceof SubmodelElementCollection) {
+						val leafSubsteps = extractExecutableSubsteps(substep as SubmodelElementCollection)
+						pendingSubsteps.addAll(leafSubsteps)
+					}
+				}
+			}
+		
+			startNextSubstep()
+
+		// Incoming Message "SubstepSMC" (Not Central Agent)
+		} else {
+			
+			val substep = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
+			var stepId = "unknown"
+			for (elem : substep.value) {
+				if (elem instanceof Property && elem.idShort == "StepId") {
+					stepId = (elem as Property).value
+				}
+			}
+			info("Resource agent executes substep: " + stepId)
+
+			// FaultDetectionSkill
+			val productionLog = aasHelper.getSubmodelByIdShort(this.aas, "ProductionLog") as Submodel
+			if (productionLog !== null) {
+				val detectedFaultLogs = detectFaultSkill.detectFaults(productionLog, this.aas, substep)
+
+				val allPreviousLogs = faultLogBuffer.entrySet.filter[it.key != this.aas_id].flatMap[it.value].map [
+					it as Referable].toList
+
+				if (detectFaultSkill.isAborted == true) {
+					warning("FATAL: Production has been stopped")
+				}
+			
+				// HETERARCHICAL: Send FaultLogs to other agents in the same hierarchy
+				if (!detectedFaultLogs.empty && detectionMode == FaultDetectionMode.HETERARCHICAL) {
+					val faultLogMsg = message_skill.create_I40_Message(
+						this.aas_id,
+						"",
+						I40_MessageTypes.INFORMING,
+						UUID.randomUUID.toString,
+						detectedFaultLogs.filter[it instanceof SubmodelElementCollection].map[it as Referable].toList
+					)
+
+					emit(this.comspace, new FaultLogBroadcast => [
+						message = faultLogMsg
+					])
+					
+				info(allPreviousLogs.size + " received FaultLogs, " + detectedFaultLogs.size + " own FaultLogs")
+				
+				// Classify Faults with received and detected FaultLogs 
+				detectFaultSkill.classifyFaults(detectedFaultLogs, allPreviousLogs)
+
+				// HIERARCHICAL: Send FaultLogs to CentralAgent
+				} else if (detectionMode == FaultDetectionMode.HIERARCHICAL) {
+					val faultLogMsg = message_skill.create_I40_Message(
+						this.aas_id,
+						CentralAAS,
+						I40_MessageTypes.INFORMING,
+						UUID.randomUUID.toString,
+						detectedFaultLogs.filter[it instanceof SubmodelElementCollection].map[it as Referable].toList
+					)
+
+					emit(this.comspace, new FaultLogBroadcast => [
+						message = faultLogMsg])				
+				}				
+			}
+			
+			// Inform Central Agent that Substep is completed
+			if (!detectFaultSkill.isAborted) {
+				val updateMsg = message_skill.create_I40_Message(
+					this.aas_id,
+					occurrence.message.frame.sender,
+					I40_MessageTypes.INFORMING,
+					occurrence.message.frame.conversationID,
+					List.of(substep)
+				)
+				emit(this.comspace, new ResourceUpdate => [message = updateMsg])
+				info("Substep completed: " + stepId)
+			}
+
+		}
+	}
+
+	// Initiate next Substep when previous Substep is completed
+	on ResourceUpdate [occurrence.message.frame.receiver == this.aas_id] {
+		if (this.isCentralAgent) {
+			startNextSubstep()
+		}
+	}
+
+	// FaultLogBroadcast in HIERARCHICAL Case
+	on FaultLogBroadcast [occurrence.message.frame.receiver == this.aas_id] {
+		val sender = occurrence.message.frame.sender
+		val logs = occurrence.message.interactionElements.filter [
+			it instanceof SubmodelElementCollection
+		].map[it as SubmodelElementCollection].toList
+
+		faultLogBuffer.put(sender, logs)
+		val summary = faultLogBuffer.entrySet.map [it.value.size + " FaultLogs from " + it.key].join(", ")
+
+		info("Received FaultLogs:  " + summary)
+
+		val allLogs = faultLogBuffer.values.flatten.map[it as Referable].toList
+		info("Start classification with  " + allLogs.size + " Logs:")
+		detectFaultSkill.classifyFaults(new ArrayList<Referable>(), allLogs)
+
+	}
+
+	// FaultLogBroadcast in HETERARCHICAL Case
+	on FaultLogBroadcast {
+		val msg = occurrence.message
+		val sender = msg.frame.sender
+		val receiver = msg.frame.receiver
+
+		if (sender != this.aas_id && (receiver == "" || receiver == this.aas_id)) {
+
+			val logs = msg.interactionElements.filter [
+				it instanceof SubmodelElementCollection
+			].map[it as SubmodelElementCollection].toList
+
+			faultLogBuffer.put(sender, logs)
+	}
+}
+
+	// Execute Substep
+	private	def extractExecutableSubsteps(substep : SubmodelElementCollection) : List<SubmodelElementCollection> {
+		val result = new ArrayList<SubmodelElementCollection>()
+
+		val nestedSubsteps = substep.value.findFirst [
+			it instanceof SubmodelElementList && it.idShort == "Substeps"
+		] as SubmodelElementList
+
+		if (nestedSubsteps !== null && !nestedSubsteps.value.empty) {
+			for (nested : nestedSubsteps.value) {
+				if (nested instanceof SubmodelElementCollection) {
+					result.addAll(extractExecutableSubsteps(nested as SubmodelElementCollection))
+				}
+			}
+		} else {
+			result.add(substep)
+		}
+		return result
+}
+
+	// Initiate next Substep
+	def startNextSubstep() {
+		if (!pendingSubsteps.empty) {
+			val next = pendingSubsteps.remove(0)
+			val resource = next.value.findFirst [
+				it instanceof SubmodelElementCollection && it.idShort == "Resource"
+			] as SubmodelElementCollection
+
+			val resourceRef = resource?.getAASElement("ResourceReference") as ReferenceElement
+			val resourceAASId = resourceRef?.value?.keys?.get(0)?.value
+
+			if (resourceAASId !== null) {
+				val msg = message_skill.create_I40_Message(
+					this.aas_id,
+					resourceAASId,
+					I40_MessageTypes.REQUIREMENT,
+					currentStepConversationId,
+					List.of(next)
+				)
+				emit(this.comspace, new RequestProduction => [message = msg])
+				info("Initiate substep with ID: " + (next.getAASElement("StepId") as Property)?.value)
+			}
+		} else {
+			info("All substeps completed.")
+	}
+}
+
+	// Execute Step
+	private	def executeStep(step : SubmodelElementCollection) {
+		var resourceSMC = step.getAASElement("Resource") as SubmodelElementCollection
+		var resourceReference = resourceSMC.getAASElement("ResourceReference") as ReferenceElement;
+		var resourceId : String = resourceReference.value.keys.get(0).value.toString()
+		var interactionElements : List<Referable> = new ArrayList<Referable>()
+		interactionElements.add(step)
+		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
+			I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
+		emit(this.comspace, new RequestProduction => [message = new_message])
+	}
+
+	// Reset ProductionLog
+	def resetAAS() {
+		val productionLog = aasHelper.getSubmodelByIdShort(this.aas, "ProductionLog") as Submodel
+		if (productionLog === null) {
+			warning("ProductionLog submodel not found.")
+			return
+		}
+		val resourceLogsWrapper = productionLog.submodelElements.findFirst [
+			it instanceof SubmodelElementCollection && it.idShort == "ResourceLogs"
+		] as SubmodelElementCollection
+		if (resourceLogsWrapper === null) {
+			warning("ResourceLogs SMC not found in ProductionLog.")
+			return
+		}
+		val resourceLogsSML = resourceLogsWrapper.getAASElement("ResourceLogs") as SubmodelElementList
+		if (resourceLogsSML !== null) {
+			resourceLogsSML.value.clear()
+		}
+		val faultLogsSML = resourceLogsWrapper.getAASElement("FaultLogs") as SubmodelElementList
+		if (faultLogsSML !== null) {
+			faultLogsSML.value.clear()
+		}
+		try {
+			aasHelper.updateSubmodel(productionLog)
+			info("ProductionLog reset.")
+		} catch (e : Exception) {
+			warning("Error while resetting productionLog: " + e.message)
+	}
+}
+}

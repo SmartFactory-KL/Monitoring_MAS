@@ -1,0 +1,25 @@
+/** 
+ * 
+ */
+package events
+
+import i40_messages.I40_Message
+/** 
+ * @author Ali Karnoub
+ * 
+ */
+event RequestProduction {
+	var message : I40_Message
+	new () {}
+}
+
+event ResourceUpdate {
+	var message : I40_Message
+	var uc : int
+
+	new() {}
+}
+
+event FaultLogBroadcast {
+	var message : I40_Message
+}

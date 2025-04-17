@@ -1,0 +1,38 @@
+package capacities
+
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import org.eclipse.digitaltwin.aas4j.v3.model.Submodel
+import java.util.List
+import org.eclipse.digitaltwin.aas4j.v3.model.AssetAdministrationShell
+import org.eclipse.digitaltwin.aas4j.v3.model.Referable
+
+/** 
+ * @author Ali Karnoub
+ * 
+ */
+capacity FaultDetectionCapacity {
+
+	/** 
+	 * Berechnet die Fehlerwahrscheinlichkeit nach Bayes: \( P(F_i | D_i) \).
+	 * @param likelihood P(D_i | F_i): Wahrscheinlichkeit, dass die Sensordaten auftreten, wenn der Fehler vorliegt.
+	 * @param prior P(F_i): Vorwissen über Fehlerwahrscheinlichkeit.
+	 * @param evidence P(D_i): Gesamtwahrscheinlichkeit für die beobachteten Sensordaten.
+	 * @return: Die berechnete Fehlerwahrscheinlichkeit als Wert zwischen 0 und 1.
+	 */
+	def calculateFaultProbability(likelihood : Double, prior : Double, evidence : Double) : Double
+
+	/** 
+	 * Berechnet die Gesamtfehlerwahrscheinlichkeit in einem hierarchischen System:  \( P(F) = 1 - \prod_{i=1}^{n} (1 - P(F_i)) \).
+	 * @param faultProbabilities: Liste der Fehlerwahrscheinlichkeiten der einzelnen Module.
+	 * @return: Die berechnete Fehlerwahrscheinlichkeit für das gesamte Produktionssystem.
+	 */
+	def calculateSystemFaultProbability(faultProbabilities : List<Double>) : Double
+
+	/** 
+	 * Führt eine Analyse der Fehlerdaten durch und klassifiziert das Problem.
+	 * @param step: Die aktuellen Sensordaten aus dem SubmodelElementCollection des Produktionsschritts.
+	 * @return: Eine Liste von Fehlern (als String), falls welche erkannt werden.
+	 */
+	 
+	def detectFaults(productionLog : Submodel, aas : AssetAdministrationShell, SubstepSMC:SubmodelElementCollection) : List<Referable>
+}
