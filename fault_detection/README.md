@@ -1,19 +1,18 @@
 # Distributed Monitoring System as Multi-Agent System for Fault Detection
 
-## 🚀 Quick Installation Guide
+##  Quick Installation Guide
 
 This MAS (Multi-Agent System) is built using the [SARL language](http://www.sarl.io), which is based on Java.
 
-### 🧩 Prerequisites
+###  Prerequisites
 
-1. Install **Java** – preferably version 11.  
-   👉 [OpenJDK Downloads](https://openjdk.org/install/)
+1. Install **Java** – preferably version 11. [OpenJDK Downloads](https://openjdk.org/install/)
 2. Install the **SARL IDE** from [sarl.io](http://www.sarl.io/download/index.html)
 3. Clone this project to your local machine
 4. In SARL IDE:  
    `File → Import → Maven → Existing Maven Project`
 
-### ✅ Common Issues & Fixes
+### Common Issues & Fixes
 
 **Compilation errors?**
 
@@ -30,12 +29,12 @@ This MAS (Multi-Agent System) is built using the [SARL language](http://www.sarl
   - Or manually installing the BaSyx library into your local `.m2` repository
 
 
-## 🧪 AAS Environment Setup (via Docker)
+## AAS Environment Setup (via Docker)
 
 This system interacts with BaSyx Asset Administration Shells (AAS).  
 You can spin up a full BaSyx environment using Docker Compose.
 
-### ▶️ Start the Environment
+### Start the Environment
 
 Make sure Docker is installed. Then run:
 
@@ -43,7 +42,7 @@ Make sure Docker is installed. Then run:
 docker-compose up -d
 ```
 
-### 🔌 Default Services and Ports
+### Default Services and Ports
 
 Once started, these services are available:
 
@@ -54,13 +53,13 @@ Once started, these services are available:
 - Dashboard API → http://localhost:8085  
 - Web UI → http://localhost:3000
 
-### 📦 Load the AAS into the Environment
+### Load the AAS into the Environment
 
 After starting the AAS environment, you need to upload the required AAS from the provided folder in this repository to the running BaSyx AAS Server at `http://localhost:8081`.
 
 You can use the BaSyx Web UI or API endpoints to upload and register the AAS.
 
-## ⚙️ System Configuration
+## System Configuration
 
 You can switch the fault detection mode in `ResourceAgent`:
 
@@ -74,7 +73,7 @@ Available options:
 - `HIERARCHICAL` – Agents report to a central agent which classifies the faults
 
 
-## ▶️ Running the MAS
+## Running the MAS
 
 1. Open the `AgentSpawner` class
 2. Right-click → **Run As → SARL Agent**
