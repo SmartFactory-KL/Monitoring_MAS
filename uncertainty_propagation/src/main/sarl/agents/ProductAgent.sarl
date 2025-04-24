@@ -19,14 +19,25 @@ import org.eclipse.digitaltwin.aas4j.v3.model.Referable
 import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementList
 
 /** 
+ * The product agent represents a product in the system and manages its execution process throughout its production.
  * @author Alexis Bernhard
  */
 agent ProductAgent extends AbstractAgent {
 	uses Logging, ExternalContextAccess
 
+	/** 
+	 * The production plan submodel which contains the process description inside the agent.
+	 */
 	var productionPlan : Submodel
+
+	/** 
+	 * The production log submodel contains all production logs generated throughout the production process towards a product.
+	 */
 	var productionLog : Submodel
 
+	/** 
+	 * This method triggers the execution of a given list of production steps at the resource holon.
+	 */
 	def executeSteps(steps : List<SubmodelElement>) {
 		if (steps.size > 0) {
 			var step = steps.get(0) as SubmodelElementCollection
@@ -38,9 +49,12 @@ agent ProductAgent extends AbstractAgent {
 			var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
 				I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
 			emit(this.comspace, new ExecutionRequest => [message = new_message])
-		}  
+		}
 	}
 
+	/** 
+	 * This method initializes a product agent by retrieving the required submodels and trigger the execution of the production process.
+	 */
 	on Initialize {
 		if (this.init(occurrence.parameters, "Product")) {
 			productionPlan = aasHelper.getSubmodelByIdShort(aas, "ProductionPlan")
@@ -58,28 +72,8 @@ agent ProductAgent extends AbstractAgent {
 		}
 	}
 
-	/* TBD -> raus?
-	 * on ExecutionUpdate [occurrence.actionID.toLowerCase.equals(
-	 * (cur_action.getAASElement("ActionTitle") as Property).value.toLowerCase) && occurrence.resourceID ==
-	 * (cur_action.getAASElement("SkillReference") as ReferenceElement).value.keys.get(0).value.toString()] {
-	 * info("Test Action1: " + occurrence.actionID + ", Action2: " +
-	 * (cur_action.getAASElement("ActionTitle") as Property).value)
-	 * var actionState : ActionState = ActionState.valueOf(
-	 * (cur_action.getAASElement("Status") as Property).value.toUpperCase);
-	 * switch (occurrence.actionState) {
-	 * case "STOPPED": actionState = actionState.suspend()
-	 * case "EXECUTE": actionState = actionState.start()
-	 * case "IDLE": actionState = actionState.reset()
-	 * case "HELD": actionState = actionState.suspend()
-	 * case "SUSPENDED": actionState = actionState.suspend()
-	 * case "COMPLETE": actionState = actionState.complete()
-	 * case "ABORTED": actionState = actionState.abort()
-	 * }
-	 * info("Update action " + occurrence.actionID + ", current state: " + occurrence.actionState + ", new state: " +
-	 * actionState)
-	 * (cur_action.getAASElement("Status") as Property).value = actionState.toString.toLowerCase
-	 * aasHelper.updateSubmodel(productionPlan)
-	 * }
+	/** 
+	 * The execution update reacts on execution updates from the resource system by printing the result. Warning: This is a stub and can be extended in the future towards a complete production system.
 	 */
 	on ExecutionUpdate [occurrence.message.frame.receiver == this.aas_id] {
 		info("Execution updated with SMC idshort: " + occurrence.message.interactionElements.get(0).idShort)
@@ -97,6 +91,9 @@ agent ProductAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * Resets the AAS to prepare for a new production run. This is required since this small sample works with the same AAS instead of spawning and deleting new AASs.
+	 */
 	def resetAAS() {
 		info("Reset Production plan of AAS " + aas.idShort)
 		var totalState = aasHelper.getAASChild(productionLog, "Status") as Property;
@@ -122,6 +119,9 @@ agent ProductAgent extends AbstractAgent {
 		aasHelper.updateSubmodel(productionLog)
 	}
 
+	/** 
+	 * Transforms a hierarchical step to a flat heterarchical step to switch between hierarchical and heterarchical execution.
+	 */
 	def transformHierachicalStep(step : SubmodelElementCollection) : List<SubmodelElementCollection> {
 		var resultSteps : List<SubmodelElementCollection> = new ArrayList<SubmodelElementCollection>
 		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList

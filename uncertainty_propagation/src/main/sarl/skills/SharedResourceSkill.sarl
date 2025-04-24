@@ -11,15 +11,25 @@ import java.util.List
 import java.util.ArrayList
 
 /** 
+ * Stores shared resource data required for parallel execution of agents.
  * @author Alexis Bernhard
- * 
  */
 skill SharedResourceSkill implements SharedResourceCapacity {
 
+	/**
+	 * The counter is a major part of a barrier implementation counting all finalized agent executions waiting at the barrier for other agents. The mapping maps a production step on the number of witing agents for this production step.
+	 */
 	var counter : Map<String, Integer> = new HashMap<String, Integer>()
+	
+	/**
+	 * Contains all parallel calculated uncertainties. This list allows parallelization safe map updates.
+	 */
 	var uncertainties : Map<String, List<SubmodelElementCollection>> = new HashMap<String, List<SubmodelElementCollection>>()
  
-	def synchronized changeCounter(key : String, increase : boolean) {
+ 	/**
+ 	 * Increases (increase is true) or decreases (increase is false) the counter of the production step named as key.
+ 	 */
+	override synchronized changeCounter(key : String, increase : boolean) {
 		if (increase) {
 			counter.put(key, counter.get(key) + 1)
 		} else {
@@ -27,31 +37,52 @@ skill SharedResourceSkill implements SharedResourceCapacity {
 		}
 	}
  
-	def synchronized changeUncertainty(key : String, content : SubmodelElementCollection) {
+ 	/**
+ 	 * Adds an uncertainty content to the uncertanty list entry key. Key is a production step id.
+ 	 */
+	override synchronized changeUncertainty(key : String, content : SubmodelElementCollection) {
 		this.uncertainties.get(key).add(content)
 	}
 
-	def getCounter() : Map<String, Integer> {
+	/**
+	 * Retrieves the counter which maps a production step on the number of witing agents for this production step.
+	 */
+	override getCounter() : Map<String, Integer> {
 		return counter
 	}
 
-	def getUncertainty() : Map<String, List<SubmodelElementCollection>> {
+	/**
+	 * Retrieves the shared uncertainty values between all agents.
+	 */
+	override getUncertainty() : Map<String, List<SubmodelElementCollection>> {
 		return uncertainties
 	}
 
-	def getCounter(key : String) : Integer {
+	/**
+	 * Retrieves the counter for the production step "key".
+	 */
+	override getCounter(key : String) : Integer {
 		return counter.get(key)
 	}
 
-	def getUncertainty(key : String) : List<SubmodelElementCollection> {
+	/**
+	 * Retrieves the list of uncertainties for the production step "key".
+	 */
+	override getUncertainty(key : String) : List<SubmodelElementCollection> {
 		return uncertainties.get(key)
 	}
 
-	def addKeyCounter(key : String) {
+ 	/**
+ 	 * Adds a new production step entry to the counter.
+ 	 */
+	override addKeyCounter(key : String) {
 		counter.putIfAbsent(key, 0)
 	}
 
-	def addKeyUncertainty(key : String) {
+	/**
+ 	 * Adds a new production step entry to the uncertainty list and initializes the list for the production step.
+ 	 */
+	override addKeyUncertainty(key : String) {
 		uncertainties.putIfAbsent(key, new ArrayList<SubmodelElementCollection>())
 	}
 

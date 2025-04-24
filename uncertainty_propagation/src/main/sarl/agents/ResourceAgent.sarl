@@ -34,7 +34,6 @@ import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElement
 import org.eclipse.digitaltwin.aas4j.v3.model.DataTypeDefXsd;
 import org.eclipse.digitaltwin.aas4j.v3.model.ReferenceTypes;
 import org.eclipse.digitaltwin.aas4j.v3.model.KeyTypes
-import main.Agent
 
 /** 
  * @author Alexis Bernhard
@@ -44,21 +43,59 @@ import main.Agent
 agent ResourceAgent extends AbstractAgent {
 	uses Logging, Lifecycle, DefaultContextInteractions, ExternalContextAccess
 
+	/** 
+	 * The estimate uncertainty skill to estimate and propagate uncertainties.
+	 */
 	var estimateUncertaintySkill : UncertaintyEstimatorSkill
 
-	var bom : Submodel 
+	/** 
+	 * The bom submodel which indicates the structure of an holon. Based on this structure other subholons are spawned.
+	 */
+	var bom : Submodel
+
+	/** 
+	 * The skill submodel containing all skills of the respective submodel. For this use case the skills are unused.
+	 */
 	var skillSM : Submodel
+
+	/** 
+	 * The production plan containing all production steps which need to be executed of this resource holon.
+	 */
 	var productionPlan : Submodel
+
+	/** 
+	 * The production log containing all resource related monitoring data generated throughout the execution of production processes.
+	 */
 	var productionLog : Submodel
 
+	/** 
+	 * The AAS generator which is able to generate AAS conform java objects which can added to the AASs.
+	 */
 	var aasgen : AasGenerator
+
+	/** 
+	 * An AAS independant list of all contained skills of the module.
+	 */
 	var skills : Map<String, String>
+
+	/** 
+	 * 
+	 */
 	var messageBuffer : Map<String, String[]> = new HashMap<String, String[]>
 
+	/** 
+	 * The shared resource skill of use case 3 to enable parallelization in this use case.
+	 */
 	var sharedResourceSkill3 : SharedResourceSkill
 
+	/** 
+	 * A buffer to find the parent of a given step.
+	 */
 	var childSteps : Map<String, String> = new HashMap<String, String>
 
+	/** 
+	 * This method spawns all subagents of a resource holon based on the definition in the bom.
+	 */
 	def spawnSubAgents() {
 		var resource_holon = bom.submodelElements.stream().findFirst().get()
 		if (!(resource_holon instanceof Entity)) {
@@ -85,6 +122,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * Initializes a resource holon and all its parameters and loads all required submodels resets the AAS.
+	 */
 	on Initialize {
 		if (this.init(occurrence.parameters, "Resource")) {
 			bom = aasHelper.getSubmodelByIdShort(aas, "BillOfMaterial")
@@ -107,45 +147,55 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * Triggers on arriving execution requests from the product holon and manages the execution of the resource and calculates in this case the mixed uncertainty. 
+	 */
 	on ExecutionRequest [occurrence.message.frame.receiver == this.aas_id] {
 		info("Start request at " + System.nanoTime())
 		var step = occurrence.message.interactionElements.remove(0) as SubmodelElementCollection
 		// upload step to AAS
 		var stepList = aasHelper.getAASChild(productionPlan, "Steps") as SubmodelElementList;
 		stepList.value.add(step)
-		aasHelper.updateSubmodel(productionPlan) 
+		aasHelper.updateSubmodel(productionPlan)
 
 		var stepId = aasHelper.getAASChild(step, "StepId") as Property
-		/*sharedResourceSkill.addKeyCounter(stepId.value)
+		sharedResourceSkill.addKeyCounter(stepId.value)
 		sharedResourceSkill.addKeyUncertainty(stepId.value)
-		this.executeHierarchicalProduction(stepId, step)*/
-		/*sharedResourceSkill3.addKeyCounter(stepId.value)
-		sharedResourceSkill3.addKeyUncertainty(stepId.value)
-		var messageMetaData = #[occurrence.message.frame.sender, occurrence.message.frame.conversationID, "P"]
-		messageBuffer.put(stepId.value, messageMetaData)
-		this.executeHierarchicalProduction3(step)*/
-		var steps = new ArrayList<SubmodelElementCollection>
-		for (elem : occurrence.message.interactionElements) {
-			if (elem instanceof SubmodelElementCollection) {
-				var step1 = elem as SubmodelElementCollection
-				steps.add(step1)
-			}
-		}
-		
-		var elements = new ArrayList<SubmodelElement>();
-		elements.add(aasgen.createProperty("ConversationId", DataTypeDefXsd.STRING, occurrence.message.frame.conversationID))
-		elements.add(aasgen.createProperty("Sender", DataTypeDefXsd.STRING, occurrence.message.frame.sender))
-		var productMetaData = aasgen.createSMC("UncertaintyResult", elements) 
-		this.executeHeterarchicalProduction2(null, productMetaData, steps)
+		this.executeHierarchicalProduction(stepId, step)
+
+	/* sharedResourceSkill3.addKeyCounter(stepId.value)
+	 * sharedResourceSkill3.addKeyUncertainty(stepId.value)
+	 * var messageMetaData = #[occurrence.message.frame.sender, occurrence.message.frame.conversationID, "P"]
+	 * messageBuffer.put(stepId.value, messageMetaData)
+	 * this.executeHierarchicalProduction3(step)
+	 */
+
+	/* var steps = new ArrayList<SubmodelElementCollection>
+	 * for (elem : occurrence.message.interactionElements) {
+	 * if (elem instanceof SubmodelElementCollection) {
+	 * var step1 = elem as SubmodelElementCollection
+	 * steps.add(step1)
+	 * }
+	 * }
+	 * 
+	 * var elements = new ArrayList<SubmodelElement>();
+	 * elements.add(aasgen.createProperty("ConversationId", DataTypeDefXsd.STRING, occurrence.message.frame.conversationID))
+	 * elements.add(aasgen.createProperty("Sender", DataTypeDefXsd.STRING, occurrence.message.frame.sender))
+	 * var productMetaData = aasgen.createSMC("UncertaintyResult", elements) 
+	 * this.executeHeterarchicalProduction2(null, productMetaData, steps)
+	 */
 	}
 
+	/** 
+	 * This method reacts on a resource update by child holons and updates its own resource logs and  / or forwards the message to other holons.
+	 */
 	on ResourceUpdate [occurrence.message.frame.receiver == this.aas_id] {
 		var stepId = occurrence.message.interactionElements.get(1) as Property
 		var logEntry = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
 		var dataObjects = aasHelper.getAASChild(logEntry, "DataObjects") as SubmodelElementList
 		if (occurrence.uc == 1) {
 			sharedResourceSkill.changeCounter(stepId.value, false)
-//			info("Counter: " + sharedResourceSkill.getCounter())
+			// info("Counter: " + sharedResourceSkill.getCounter())
 			sharedResourceSkill.changeUncertainty(stepId.value, (dataObjects.value.get(0) as SubmodelElementCollection))
 			if (sharedResourceSkill.getCounter(stepId.value) <= 0) {
 				var result = estimateUncertaintySkill.fuseSMC(sharedResourceSkill.getUncertainty(stepId.value))
@@ -153,7 +203,8 @@ agent ResourceAgent extends AbstractAgent {
 				info(
 					"Resulting distributed uncertainty 1: [" + result.get(0) + ", " + result.get(1) + ", " +
 						result.get(2) + "]")
-				emitExecutionUpdateMessage(result, 1, occurrence.message.frame.conversationID, occurrence.message.frame.sender)
+				emitExecutionUpdateMessage(result, 1, occurrence.message.frame.conversationID,
+					occurrence.message.frame.sender)
 			}
 		} else if (occurrence.uc == 3) {
 			var parentStepId = this.childSteps.remove(stepId.value)
@@ -165,6 +216,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method reacts on a production requests and starts the execution depending on the applied use case.
+	 */
 	on RequestProduction [occurrence.message.frame.receiver == this.aas_id] {
 		if (occurrence.uc == 1) {
 			var step = occurrence.message.interactionElements.get(0) as SubmodelElementCollection
@@ -181,7 +235,8 @@ agent ResourceAgent extends AbstractAgent {
 					uncertainties.add(estimateUncertaintySkill.estimate_action_uncertainty(actionReference.toString))
 				}
 				var result = estimateUncertaintySkill.fuse(uncertainties)
-				emitResourceUpdateMessage(result, 1, generalStepId.value, occurrence.message.frame.sender, occurrence.message.frame.conversationID)
+				emitResourceUpdateMessage(result, 1, generalStepId.value, occurrence.message.frame.sender,
+					occurrence.message.frame.conversationID)
 			}
 		} else if (occurrence.uc == 2) {
 			var uncertainty = occurrence.message.interactionElements.remove(0) as SubmodelElementCollection
@@ -207,6 +262,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method loads all skills of the resource element and fills the internal list of skills.
+	 */
 	def loadSkills() {
 		skills = new HashMap<String, String>()
 		var skillList : SubmodelElementList = skillSM.submodelElements.stream().filter([ smc |
@@ -227,6 +285,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method create submodelelement collection for one uncertainty value represented as input array.
+	 */
 	def arrayToSMC(array : double[]) : SubmodelElementCollection {
 		var elements = new ArrayList<SubmodelElement>();
 		elements.add(aasgen.createProperty("Mean", DataTypeDefXsd.DOUBLE, array.get(0).toString))
@@ -235,6 +296,10 @@ agent ResourceAgent extends AbstractAgent {
 		return aasgen.createSMC("UncertaintyResult", elements)
 	}
 
+	/** 
+	 * This method generates a resource log entry by adding the timestamp of the log (datetime), the logType (error / warning / information / ...),
+	 * a general description and the log entries as a List of SubmodelElements (dataObjects). 
+	 */
 	def generateLogEntry(dateTime : String, logType : String, description : String,
 		dataObjects : List<SubmodelElement>) : SubmodelElementCollection {
 		var logEntryElems = new ArrayList<SubmodelElement>()
@@ -249,6 +314,9 @@ agent ResourceAgent extends AbstractAgent {
 		return aasgen.createSMC("LogEntry", logEntryElems)
 	}
 
+	/** 
+	 * This method resets the AAS by clearing all production logs and steps in the production plan.
+	 */
 	def resetAAS() {
 		// reset production plan
 		var stepList = aasHelper.getAASChild(productionPlan, "Steps") as SubmodelElementList;
@@ -261,7 +329,7 @@ agent ResourceAgent extends AbstractAgent {
 	}
 
 	/*** 
-	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value.
+	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value for use case 1.
 	 */
 	def executeHierarchicalProduction(stepId : Property, step : SubmodelElementCollection) {
 		subStepCallExecution(stepId, step)
@@ -274,8 +342,8 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
-	/*** 
-	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value.
+	/** 
+	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value for use case 2.
 	 */
 	def executeHeterarchicalProduction2(pastUncertainty : SubmodelElementCollection,
 		productMetaData : SubmodelElementCollection, steps : List<SubmodelElementCollection>) {
@@ -315,6 +383,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method calculates the uncertainty of a given step as argument and returns the fused uncertainty value for use case 3.
+	 */
 	def executeHierarchicalProduction3(step : SubmodelElementCollection) {
 		subStepCallExecution3(step)
 		var stepId = aasHelper.getAASChild(step, "StepId") as Property
@@ -336,7 +407,7 @@ agent ResourceAgent extends AbstractAgent {
 	}
 
 	/** 
-	 * This routine represents the uncertainty of a substep und fetches all uncertainty of itschilds and returns one shared uncerainty to the product holen.
+	 * This routine represents the uncertainty of a substep und fetches all uncertainty of its childs and returns one shared uncerainty to the product holon for use case 1.
 	 */
 	private def subStepCallExecution(stepId : Property, step : SubmodelElementCollection) {
 		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList
@@ -348,6 +419,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This routine represents the uncertainty of a substep und fetches all uncertainty of its childs and returns one shared uncerainty to the product holon for use case 3.
+	 */
 	private def subStepCallExecution3(step : SubmodelElementCollection) {
 		var stepId = aasHelper.getAASChild(step, "StepId") as Property
 		var substeps = aasHelper.getAASChild(step, "Substeps") as SubmodelElementList
@@ -364,6 +438,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method fuses the final uncertainty, prints the result and emits an execution update message with the given sender, conversation id and steo Id.
+	 */
 	def generateFinalOutput(sender : String, convId : String, stepId : String) {
 		if (sharedResourceSkill3.getCounter(stepId) <= 0) {
 			var fusedUncertainty = estimateUncertaintySkill.fuseSMC(sharedResourceSkill3.getUncertainty(stepId))
@@ -378,6 +455,9 @@ agent ResourceAgent extends AbstractAgent {
 		}
 	}
 
+	/** 
+	 * This method emits a request production message to request the production of the given production step stored already in the interactionElements list for the input use case "usecase".
+	 */
 	def emitRequestProductionMessage(step : SubmodelElementCollection, interactionElements : List<Referable>,
 		usecase : int) {
 		var resource = aasHelper.getAASChild(step, "Resource") as SubmodelElementCollection
@@ -385,10 +465,13 @@ agent ResourceAgent extends AbstractAgent {
 		var resourceId = resourceRef.value.keys.get(0).value
 		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, resourceId,
 			I40_MessageTypes.REQUIREMENT, UUID.randomUUID().toString, interactionElements)
-//		info("Emit Request Production Message with size: " + new_message.size)
+		// info("Emit Request Production Message with size: " + new_message.size)
 		emit(this.comspace, new RequestProduction => [message = new_message; uc = usecase])
 	}
 
+	/** 
+	 * This method emits a resource update message to update the agent sender and by the uncertainty result of the step with the step id "stepid" stored already in the interactionElements list for the input use case "usecase".
+	 */
 	def emitResourceUpdateMessage(result : double[], usecase : int, stepId : String, sender : String, convId : String) {
 		var interactionElements : List<Referable> = new ArrayList<Referable>()
 		var dataObjectLogList : List<SubmodelElement> = new ArrayList<SubmodelElement>()
@@ -399,15 +482,18 @@ agent ResourceAgent extends AbstractAgent {
 		var resLogsList = aasHelper.getAASChild(resLogs, "ResourceLogs") as SubmodelElementList
 		resLogsList.value.add(logEntry)
 		aasHelper.updateSubmodel(productionLog)
-//		info("logEntry size: " + Agent.getObjectSize(logEntry))
+		// info("logEntry size: " + Agent.getObjectSize(logEntry))
 		interactionElements.add(logEntry)
 		interactionElements.add(aasgen.createProperty("StepId", DataTypeDefXsd.STRING, stepId))
 		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, sender,
-			I40_MessageTypes.INFORMING, convId, interactionElements) 
-//		info("Emit Resource Update Message with size: " + new_message.size)
+			I40_MessageTypes.INFORMING, convId, interactionElements)
+		// info("Emit Resource Update Message with size: " + new_message.size)
 		emit(this.comspace, new ResourceUpdate => [message = new_message; uc = usecase])
 	}
 
+/** 
+	 * This method emits an execution update message to pass an excution update to a product holon "sender" for the input use case "usecase".
+	 */
 	def emitExecutionUpdateMessage(result : double[], usecase : int, sender : String, convId : String) {
 		info("Result ready at " + System.nanoTime())
 		var dataObjectLogList : List<SubmodelElement> = new ArrayList<SubmodelElement>()
@@ -422,7 +508,7 @@ agent ResourceAgent extends AbstractAgent {
 		interactionElements.add(outLogEntry)
 		var new_message : I40_Message = message_skill.create_I40_Message(this.aas_id, sender,
 			I40_MessageTypes.INFORMING, convId, interactionElements)
-//		info("Emit Execution Update Message with size: " + new_message.size)
+		// info("Emit Execution Update Message with size: " + new_message.size)
 		emit(this.comspace, new ExecutionUpdate => [message = new_message])
 	}
 }

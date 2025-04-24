@@ -8,12 +8,21 @@ import i40_messages.I40_Message
 import org.eclipse.digitaltwin.aas4j.v3.model.Referable
 
 /** 
+ * This capacity enables an agent to create industry 4.0 messages.
  * @author Alexis Bernhard
- * 
  */
 capacity I40_Message_Capacity { 
 	
+	/**
+	 * Creates a new Industry 4.0 message (see VDI/VDE 2193 part 1 from year 2020) with a minimal set of fields:
+	 * The sender id who sent the message, the receiver id who receives the message and the msg_type (see the specification for all message types)
+	 */
 	def create_I40_Message(sender : String, receiver : String, msg_type : String) : I40_Message 
 	
+	/**
+	 * Creates a new Industry 4.0 message (see VDI/VDE 2193 part 1 from year 2020) with more custom fields:
+	 * The sender id who sent the message, the receiver id who receives the message and the msg_type (see the specification for all message types)
+	 * The conversation id of a full conversation and the interactionelements as content of the message.
+	 */
 	def create_I40_Message(sender : String, receiver : String, msg_type : String, aas_id : String, interactionElements : List<Referable>) : I40_Message
 }

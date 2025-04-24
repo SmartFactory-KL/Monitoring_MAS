@@ -4,15 +4,31 @@
 package capacities
 
 import java.util.List
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
 
 /** 
+ * This capacity allows an agent to estimate and propagate uncertainties.
  * @author Alexis Bernhard
- * 
  */
 capacity UncertaintyEstimatorCapacity {
 	
+	/** 
+	 * Retrieves the estimated action uncertainty of one skill (given by the skillId) on the managed resource.
+	 * For simplicity reasons randomly generated numbers are taken. A deeper calculation is not part of the given paper.
+	 */
 	def estimate_action_uncertainty(skillId : String) : double[]
+	
+	/** 
+	 * Fuses all uncertainties in the list given in the uncertainties argument by applying a Bayesian Fusion algorithm.
+	 * This algorithm is only suitable for Gaussian distributions and is represented as array with the mean as first entry,
+	 * the variance of a given distribution as second value and the weight of the Fusion as third value.
+	 * The weight is an integer weight to represent the weight of a Kalman Filter entry towards all entries.
+	 */
 	def fuse(uncertainties : List<double[]>) : double[]
 	
-//	def calculateUncertainty(step : SubmodelElementCollection) : double[]
+	/**
+	 * Fuses all uncertainties stored in the submodel element collection. For the fusion, this method extracts all uncertainties in the list and adds them to an ArrayList and fuses this array list.
+	 * For a detailed description of the list content, please see the fusion method of the ArrayList in the same class.
+	 */
+	def fuseSMC(uncertainties : List<SubmodelElementCollection>) : double[]
 }

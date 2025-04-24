@@ -6,8 +6,8 @@ package events
 import i40_messages.I40_Message
 
 /** 
+ * A request production message indicates the desire of one resource holon to execute a production step or (sub-)process on another resource. 
  * @author Alexis bernhard
- * 
  */
 event RequestProduction {
 	var message : I40_Message
@@ -15,6 +15,9 @@ event RequestProduction {
 	new () {}
 }
 
+/**
+ * The resource update indicates the the resource wants to share an update with another resource holon.
+ */
 event ResourceUpdate {
 	var message : I40_Message
 	var uc : int

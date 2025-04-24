@@ -4,18 +4,52 @@
 package capacities
 
 import java.util.Map
+import org.eclipse.digitaltwin.aas4j.v3.model.SubmodelElementCollection
+import java.util.List
 
 /** 
+ * This capacity stores shared resource data required for parallel execution of agents.
  * @author Alexis Bernhard
- * 
  */
 capacity SharedResourceCapacity { 
 	
+	/**
+ 	 * Increases (increase is true) or decreases (increase is false) the counter of the production step named as key.
+ 	 */
 	def changeCounter(key : String, increase : boolean)
 	
+	/**
+ 	 * Adds an uncertainty content to the uncertanty list entry key. Key is a production step id.
+ 	 */
+	def changeUncertainty(key : String, content : SubmodelElementCollection)
+	
+	/**
+	 * Retrieves the counter which maps a production step on the number of witing agents for this production step.
+	 */
 	def getCounter() : Map<String, Integer>
+	
+	/**
+	 * Retrieves the shared uncertainty values between all agents.
+	 */
+	def getUncertainty() : Map<String, List<SubmodelElementCollection>>
+	
+	/**
+	 * Retrieves the counter for the production step "key".
+	 */
 	def getCounter(key : String) : Integer
 	
+	/**
+	 * Retrieves the list of uncertainties for the production step "key".
+	 */
+	def getUncertainty(key : String) : List<SubmodelElementCollection>
+	
+	/**
+ 	 * Adds a new production step entry to the counter.
+ 	 */
 	def addKeyCounter(key : String)
+	
+	/**
+ 	 * Adds a new production step entry to the uncertainty list and initializes the list for the production step.
+ 	 */
 	def addKeyUncertainty(key : String)
 }

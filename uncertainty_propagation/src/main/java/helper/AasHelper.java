@@ -22,12 +22,30 @@ import org.eclipse.digitaltwin.basyx.v3.clientfacade.references.SimpleSubmodelRe
 
 public class AasHelper {
 
+	/**
+	 * The URL to the installed Basyx Registry of the predefined Basyx Server.
+	 */
 	private final static String AASRegistryURL = "http://localhost:8082";
+	
+	/**
+	 * The URL to the installed Basyx Repository / Environment of the predefined Basyx Server.
+	 */
 	private final static String RepositoryURL = "http://localhost:8081";
+	
+	/**
+	 * The URL to the installed Basyx Submodel Registry of the predefined Basyx Server.
+	 */
 	private final static String SubmodelRegistryURL = "http://localhost:8083";
 
-	BasyxReadFacade readFacade;
-	BasyxWriteFacade writeFacade;
+	/**
+	 * Basyx Read Facades to enable reading operations from AASs from Basyx by using the imported Basyx client. 
+	 */
+	private BasyxReadFacade readFacade;
+	
+	/**
+	 * Basyx Write Facades to enable writing operations to AASs registered on Basyx by using the imported Basyx client. 
+	 */
+	private BasyxWriteFacade writeFacade;
 
 	/**
 	 * The constructor of this class initializes an aas helper by setting up internal parameters and initializing the connection to the Basyx server.
@@ -126,7 +144,12 @@ public class AasHelper {
 	}
 	
 
-	
+	/**
+	 * A Helper method to get an AAS child by idshort of the given submodel element collection. Warning The idshort might not be unique and the result of this method is the first occurrence of an element with the given idshort.
+	 * @param smc The SubmodelElementCollection which is searched
+	 * @param idShort The idshort of the desired element
+	 * @return The detected submodelelement with the idshort or null if no such element could be found.
+	 */
 	public SubmodelElement getAASChild(SubmodelElementCollection smc, String idShort) {
 		try {
 			return smc.getValue().stream().filter(sme -> sme.getIdShort().contains(idShort)).findFirst().get();
@@ -136,6 +159,12 @@ public class AasHelper {
 		return null;
 	}
 	
+	/**
+	 * A Helper method to get an AAS child by idshort of the given submodel. Warning The idshort might not be unique and the result of this method is the first occurrence of an element with the given idshort.
+	 * @param smc The SubmodelE which is searched
+	 * @param idShort The idshort of the desired element
+	 * @return The detected submodelelement with the idshort or null if no such element could be found.
+	 */
 	public SubmodelElement getAASChild(Submodel sm, String idShort) {
 		try {
 			return sm.getSubmodelElements().stream().filter(sme -> sme.getIdShort().contains(idShort)).findFirst().get();

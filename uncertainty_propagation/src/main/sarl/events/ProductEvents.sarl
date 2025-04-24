@@ -6,20 +6,26 @@ package events
 import i40_messages.I40_Message
 
 /** 
+ * An execution request is a request from the product holon for a resource holon to execute a certain task. The task is encapsulated in the message as production request.
  * @author Alexis Bernhard
- * 
  */
 event ExecutionRequest {
 	var message : I40_Message
 	new () {}
 }
 
+/**
+ * An execution completed event is triggered frm a resource holon to indicate that an execution request is successfully completed.
+ */
 event ExecutionCompleted {
-	var actionID : String
+	var message : I40_Message
 	
 	new () {}
 }
 
+/**
+ * An execution update message is raised when a resource holon informs the product holon that the execution of a task has updated (e.g. enters a new state / a production step has been finalized, ...)
+ */
 event ExecutionUpdate {
 	var message : I40_Message
 	
